@@ -101,6 +101,7 @@ const Home = () => {
       types: selectedPokemon.types || [],
       unique: selectedPokemon.unique || '',
       evolutionStage: selectedPokemon.evolutionStage || 0,
+      image: null, // Reset image field
     });
     setShowEditForm(true);
   };
@@ -115,12 +116,26 @@ const Home = () => {
 
     setIsUpdating(true);
     try {
+      let imageUrl = selectedPokemon.imageUrl; // Keep existing image by default
+      
+      // If a new image was selected, upload it to Cloudinary
+      if (editFormData.image) {
+        const newImageUrl = await uploadPokemonImage(editFormData.image, editFormData.name);
+        if (!newImageUrl) {
+          showNotification('❌ Failed to upload new image. Please try again.', 'error');
+          setIsUpdating(false);
+          return;
+        }
+        imageUrl = newImageUrl;
+      }
+
       const updates = {
         name: editFormData.name,
         artist: editFormData.artist,
         types: editFormData.types,
         evolutionStage: editFormData.evolutionStage,
         ...(editFormData.unique && { unique: editFormData.unique }),
+        ...(imageUrl !== selectedPokemon.imageUrl && { imageUrl }), // Only update if image changed
         updatedAt: new Date()
       };
 
@@ -136,7 +151,8 @@ const Home = () => {
           artist: editFormData.artist,
           types: editFormData.types,
           evolutionStage: editFormData.evolutionStage,
-          unique: editFormData.unique
+          unique: editFormData.unique,
+          imageUrl: imageUrl
         } : null);
         
         await loadPokemonData(); // Refresh the data
@@ -245,6 +261,25 @@ const Home = () => {
     }
   };
 
+  const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file size (limit to 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showNotification('Image size should be less than 5MB', 'error');
+        return;
+      }
+      
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        showNotification('Please select a valid image file', 'error');
+        return;
+      }
+      
+      setEditFormData(prev => ({ ...prev, image: file }));
+    }
+  };
+
   // Position Editor Functions
   const handleDragStart = (pokemon: PokemonSlot) => {
     if (!isPositionEditorMode) return;
@@ -344,6 +379,7 @@ const Home = () => {
     types: [] as string[],
     unique: '',
     evolutionStage: 0,
+    image: null as File | null,
   });
   const [addFormData, setAddFormData] = useState({
     name: '',
@@ -508,12 +544,7 @@ const Home = () => {
 
   return (
     <>
-      <Navbar 
-        pokemonCount={filteredPokemon.filter(p => p.hasArt).length}
-        totalPokemon={151}
-        filteredCount={filteredPokemon.length}
-        hasActiveFilters={Boolean(hasActiveFilters)}
-      />
+      <Navbar />
       <div className="max-w-full mx-auto relative min-h-screen transform scale-90 origin-top mt-4">
         {/* Loading State */}
         {loading && (
@@ -613,7 +644,7 @@ const Home = () => {
                         : 'bg-white/20 text-white/80 hover:bg-white/30'
                     }`}
                   >
-                    Doesn't Evolve ({pokemonSlots.filter(p => p.unique === 'U0').length})
+                    Doesn't Evolve
                   </button>
                   <button
                     onClick={() => {
@@ -629,7 +660,7 @@ const Home = () => {
                         : 'bg-white/20 text-white/80 hover:bg-white/30'
                     }`}
                   >
-                    Evolves Once ({pokemonSlots.filter(p => p.unique === 'U1').length})
+                    Evolves Once
                   </button>
                   <button
                     onClick={() => {
@@ -645,7 +676,7 @@ const Home = () => {
                         : 'bg-white/20 text-white/80 hover:bg-white/30'
                     }`}
                   >
-                    Evolves Twice ({pokemonSlots.filter(p => p.unique === 'U2').length})
+                    Evolves Twice
                   </button>
                 </div>
               </div>
@@ -713,11 +744,23 @@ const Home = () => {
               
               {/* Pokemon List Title */}
               <div className="text-center flex-shrink-0 mt-2">
-                <h2 className={`font-bold text-base mb-2 ${
-                  isPositionEditorMode ? 'text-blue-300' : 'text-white'
-                }`}>
-                  {isPositionEditorMode ? 'POSITION EDITOR MODE' : 'POKEMON LIST'}
-                </h2>
+                <div className="flex items-center justify-center gap-3">
+                  <h2 className={`font-bold text-base mb-2 ${
+                    isPositionEditorMode ? 'text-blue-300' : 'text-white'
+                  }`}>
+                    {isPositionEditorMode ? 'POSITION EDITOR MODE' : 'POKEMON LIST'}
+                  </h2>
+                  {!isPositionEditorMode && (
+                    <div className="text-white/60 text-sm mb-2">
+                      <span className="text-yellow-300 font-bold">{filteredPokemon.filter(p => p.hasArt).length}</span> / 151 Pokemon Found
+                      {hasActiveFilters && (
+                        <span className="ml-2 text-blue-300">
+                          ({filteredPokemon.length} filtered)
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {isPositionEditorMode && (
                   <p className="text-blue-200 text-xs mb-2">
                     Drag Pokemon with artwork to swap their Pokedex positions
@@ -1095,6 +1138,44 @@ const Home = () => {
                   className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   placeholder="Enter Pokemon name"
                 />
+              </div>
+
+              {/* Current Image Preview & New Image Upload */}
+              <div>
+                <label className="block text-white font-semibold mb-2">Pokemon Image</label>
+                
+                {/* Current Image */}
+                {selectedPokemon?.imageUrl && (
+                  <div className="mb-3">
+                    <p className="text-white/60 text-sm mb-2">Current Image:</p>
+                    <div className="w-32 h-32 rounded-lg overflow-hidden border border-white/20">
+                      <img
+                        src={selectedPokemon.imageUrl}
+                        alt={selectedPokemon.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {/* New Image Upload */}
+                <div>
+                  <p className="text-white/60 text-sm mb-2">Upload New Image (optional):</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEditImageChange}
+                    className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
+                  />
+                  {editFormData.image && (
+                    <p className="text-green-400 text-sm mt-2">
+                      ✅ New image selected: {editFormData.image.name}
+                    </p>
+                  )}
+                  <p className="text-white/40 text-xs mt-1">
+                    Max size: 5MB. Supported formats: JPG, PNG, GIF, WebP
+                  </p>
+                </div>
               </div>
 
               {/* Artist Selection */}

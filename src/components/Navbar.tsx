@@ -1,14 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Home, BarChart3 } from 'lucide-react';
 
-interface NavbarProps {
-  pokemonCount?: number;
-  totalPokemon?: number;
-  filteredCount?: number;
-  hasActiveFilters?: boolean;
-}
-
-const Navbar = ({ pokemonCount = 0, totalPokemon = 151, filteredCount, hasActiveFilters }: NavbarProps) => {
+const Navbar = () => {
   const location = useLocation();
   
   const navItems = [
@@ -26,14 +19,6 @@ const Navbar = ({ pokemonCount = 0, totalPokemon = 151, filteredCount, hasActive
             </div>
             <div className="flex flex-col">
               <span className="text-yellow-300 font-bold text-xl">LG Pokedex</span>
-              <div className="text-white/60 text-sm">
-                <span className="text-yellow-300 font-bold">{pokemonCount}</span> / {totalPokemon} Pokemon Registered
-                {hasActiveFilters && filteredCount !== undefined && (
-                  <span className="ml-2 text-blue-300">
-                    ({filteredCount} filtered)
-                  </span>
-                )}
-              </div>
             </div>
           </Link>
           
