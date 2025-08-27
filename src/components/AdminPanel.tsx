@@ -3,9 +3,10 @@ import { addPokemon, uploadPokemonImage, getNextPokedexNumber } from '../service
 
 interface AdminPanelProps {
   onPokemonAdded?: () => void;
+  onShowNotification?: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
-const AdminPanel = ({ onPokemonAdded }: AdminPanelProps = {}) => {
+const AdminPanel = ({ onPokemonAdded, onShowNotification }: AdminPanelProps = {}) => {
   const [showAddForm, setShowAddForm] = useState(false);
   
   // Add Pokemon form state
@@ -14,6 +15,7 @@ const AdminPanel = ({ onPokemonAdded }: AdminPanelProps = {}) => {
     artist: '',
     types: [] as string[],
     unique: '',
+    evolutionStage: 0,
     image: null as File | null
   });
   const [isUploading, setIsUploading] = useState(false);
@@ -33,9 +35,17 @@ const AdminPanel = ({ onPokemonAdded }: AdminPanelProps = {}) => {
     { value: 'U2', label: 'Two Evolutions (U2)' }
   ];
 
+  const evolutionStageOptions = [
+    { value: 0, label: 'Base Form (Stage 0)' },
+    { value: 1, label: 'First Evolution (Stage 1)' },
+    { value: 2, label: 'Second Evolution (Stage 2)' }
+  ];
+
   const handleAddPokemon = async () => {
     if (!formData.name || !formData.artist || formData.types.length === 0 || !formData.image) {
-      alert('Please fill in all required fields and select an image');
+      if (onShowNotification) {
+        onShowNotification('Please fill in all required fields and select an image', 'error');
+      }
       return;
     }
 
@@ -59,13 +69,16 @@ const AdminPanel = ({ onPokemonAdded }: AdminPanelProps = {}) => {
         artist: formData.artist,
         types: formData.types,
         imageUrl,
+        evolutionStage: formData.evolutionStage,
         ...(formData.unique && { unique: formData.unique })
       };
 
       await addPokemon(pokemonData);
       
       setUploadSuccess(true);
-      alert(`✅ ${formData.name} has been added as Pokemon #${pokedexNumber}!`);
+      if (onShowNotification) {
+        onShowNotification(`${formData.name} has been added as Pokemon #${pokedexNumber}!`, 'success');
+      }
       
       // Call callback to refresh data in parent component
       if (onPokemonAdded) {
@@ -78,6 +91,7 @@ const AdminPanel = ({ onPokemonAdded }: AdminPanelProps = {}) => {
         artist: '',
         types: [],
         unique: '',
+        evolutionStage: 0,
         image: null
       });
       
@@ -87,19 +101,36 @@ const AdminPanel = ({ onPokemonAdded }: AdminPanelProps = {}) => {
       
     } catch (error) {
       console.error('Error adding Pokemon:', error);
-      alert('Error adding Pokemon. Check console for details.');
+      if (onShowNotification) {
+        onShowNotification('Error adding Pokemon. Check console for details.', 'error');
+      }
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleTypeToggle = (type: string) => {
-    setFormData(prev => ({
-      ...prev,
-      types: prev.types.includes(type)
-        ? prev.types.filter(t => t !== type)
-        : [...prev.types, type]
-    }));
+    setFormData(prev => {
+      if (prev.types.includes(type)) {
+        // Remove type
+        return {
+          ...prev,
+          types: prev.types.filter(t => t !== type)
+        };
+      } else if (prev.types.length < 2) {
+        // Add type (limit to 2)
+        return {
+          ...prev,
+          types: [...prev.types, type]
+        };
+      } else {
+        // Show notification when trying to add more than 2 types
+        if (onShowNotification) {
+          onShowNotification('Pokemon can only have up to 2 types', 'error');
+        }
+        return prev;
+      }
+    });
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,7 +143,7 @@ const AdminPanel = ({ onPokemonAdded }: AdminPanelProps = {}) => {
   return (
     <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 mt-8">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold text-white">✨ Add New Pokemon</h2>
+        <h2 className="text-2xl font-bold text-white">Add New Pokemon</h2>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
           className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all"
@@ -181,7 +212,7 @@ const AdminPanel = ({ onPokemonAdded }: AdminPanelProps = {}) => {
 
           {/* Unique Pokemon Option */}
           <div>
-            <label className="block text-white font-semibold mb-2">Evolution Stage</label>
+            <label className="block text-white font-semibold mb-2">Unique Evolution Status</label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {uniqueOptions.map(option => (
                 <button
@@ -197,6 +228,29 @@ const AdminPanel = ({ onPokemonAdded }: AdminPanelProps = {}) => {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Evolution Stage */}
+          <div>
+            <label className="block text-white font-semibold mb-2">Evolution Stage</label>
+            <div className="grid grid-cols-3 gap-2">
+              {evolutionStageOptions.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => setFormData(prev => ({ ...prev, evolutionStage: option.value }))}
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    formData.evolutionStage === option.value
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white/20 text-white/80 hover:bg-white/30'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-white/60 text-sm mt-1">
+              Stage {formData.evolutionStage}: {evolutionStageOptions.find(opt => opt.value === formData.evolutionStage)?.label.split(' (')[0]}
+            </p>
           </div>
 
           {/* Image Upload */}
@@ -242,7 +296,7 @@ const AdminPanel = ({ onPokemonAdded }: AdminPanelProps = {}) => {
             
             {uploadSuccess && (
               <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-4 mt-4">
-                <p className="text-green-300 font-semibold">✅ Pokemon added successfully!</p>
+                <p className="text-green-300 font-semibold">Pokemon added successfully!</p>
                 <p className="text-green-200 text-sm">Your new Pokemon is now in the Pokedex.</p>
               </div>
             )}

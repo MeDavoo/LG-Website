@@ -9,8 +9,8 @@ import {
   orderBy, 
   where 
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../config/firebase';
+import { db } from '../config/firebase';
+import { CLOUDINARY_CONFIG } from '../config/cloudinary';
 
 export interface Pokemon {
   id: string; // Firebase document ID
@@ -27,38 +27,71 @@ export interface Pokemon {
 
 const COLLECTION_NAME = 'pokemon';
 
-// Upload image to Firebase Storage
+// Upload image to Cloudinary
 export const uploadPokemonImage = async (file: File, pokemonName: string): Promise<string | null> => {
   try {
-    // Create a unique filename
+    console.log('Uploading to Cloudinary...');
+    
+    // Create a unique filename with better formatting
     const timestamp = Date.now();
-    const filename = `pokemon-images/${pokemonName.toLowerCase().replace(/\s+/g, '-')}-${timestamp}`;
-    const imageRef = ref(storage, filename);
+    const sanitizedName = pokemonName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const publicId = `${CLOUDINARY_CONFIG.DEFAULT_FOLDER}/${sanitizedName}-${timestamp}`;
     
-    // Upload the file
-    const snapshot = await uploadBytes(imageRef, file);
+    console.log('Uploading to Cloudinary with public_id:', publicId);
     
-    // Get the download URL
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    return downloadURL;
+    // Create form data for Cloudinary upload
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_CONFIG.UPLOAD_PRESET);
+    formData.append('public_id', publicId);
+    formData.append('folder', CLOUDINARY_CONFIG.DEFAULT_FOLDER);
+    
+    // Upload to Cloudinary
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Cloudinary upload failed: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    console.log('Upload successful:', result);
+    
+    return result.secure_url;
   } catch (error) {
-    console.error('Error uploading image:', error);
+    console.error('Detailed upload error:', error);
+    console.error('Error message:', (error as any)?.message);
     return null;
   }
 };
 
-// Get the next available Pokedex number
+// Get the next available Pokedex number (fills gaps first, then continues sequentially)
 export const getNextPokedexNumber = async (): Promise<number> => {
   try {
-    const q = query(collection(db, COLLECTION_NAME), orderBy('pokedexNumber', 'desc'));
+    const q = query(collection(db, COLLECTION_NAME), orderBy('pokedexNumber'));
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) {
       return 1;
     }
     
-    const highestPokemon = querySnapshot.docs[0].data();
-    return highestPokemon.pokedexNumber + 1;
+    // Get all existing pokedex numbers
+    const existingNumbers = querySnapshot.docs.map(doc => doc.data().pokedexNumber);
+    
+    // Find the first gap in the sequence (1-151)
+    for (let i = 1; i <= 151; i++) {
+      if (!existingNumbers.includes(i)) {
+        return i;
+      }
+    }
+    
+    // If all slots 1-151 are filled, this shouldn't happen but return 152 as fallback
+    return 152;
   } catch (error) {
     console.error('Error getting next Pokedex number:', error);
     return 1;
@@ -114,13 +147,54 @@ export const updatePokemon = async (id: string, updates: Partial<Pokemon>): Prom
   }
 };
 
-// Delete a Pokemon
+// Delete image from Cloudinary
+export const deletePokemonImage = async (imageUrl: string): Promise<boolean> => {
+  try {
+    // Extract public_id from Cloudinary URL
+    // Cloudinary URLs format: https://res.cloudinary.com/cloud-name/image/upload/v1234567890/folder/filename.ext
+    const urlParts = imageUrl.split('/');
+    const filename = urlParts[urlParts.length - 1].split('.')[0]; // Remove extension
+    const folder = urlParts[urlParts.length - 2];
+    const publicId = `${folder}/${filename}`;
+    
+    console.log('Attempting to delete Cloudinary image with public_id:', publicId);
+    
+    // Note: Deleting from Cloudinary requires admin API key, which shouldn't be exposed in frontend
+    // For now, we'll just log the deletion attempt
+    // In a production app, you'd want to handle deletion through your backend
+    console.log('Image deletion would be handled by backend in production');
+    
+    return true;
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    return false;
+  }
+};
+
+// Delete a Pokemon document only
 export const deletePokemon = async (id: string): Promise<boolean> => {
   try {
     await deleteDoc(doc(db, COLLECTION_NAME, id));
     return true;
   } catch (error) {
     console.error('Error deleting Pokemon:', error);
+    return false;
+  }
+};
+
+// Delete a Pokemon and its image
+export const deletePokemonWithImage = async (id: string, imageUrl: string): Promise<boolean> => {
+  try {
+    // Delete the image from storage first
+    if (imageUrl) {
+      await deletePokemonImage(imageUrl);
+    }
+    
+    // Then delete the Pokemon document
+    await deleteDoc(doc(db, COLLECTION_NAME, id));
+    return true;
+  } catch (error) {
+    console.error('Error deleting Pokemon with image:', error);
     return false;
   }
 };

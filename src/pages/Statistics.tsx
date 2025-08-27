@@ -10,7 +10,7 @@ import {
   ArcElement,
 } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
-import { Users, Image, Palette } from 'lucide-react';
+import { Users, Image, Palette, TrendingUp, TrendingDown } from 'lucide-react';
 import { getAllPokemon, Pokemon } from '../services/pokemonService';
 
 ChartJS.register(
@@ -69,13 +69,30 @@ const Statistics = () => {
     artistCount[p.artist] = (artistCount[p.artist] || 0) + 1;
   });
 
+  // Count unique Pokemon (U0, U1, U2)
+  const uniquePokemonCount = pokemonData.filter(p => p.unique && ['U0', 'U1', 'U2'].includes(p.unique)).length;
+
+  // All possible Pokemon types
+  const allPokemonTypes = [
+    'Fire', 'Water', 'Electric', 'Grass', 'Psychic', 'Dragon', 'Dark', 'Ghost', 
+    'Steel', 'Normal', 'Ice', 'Fighting', 'Poison', 'Ground', 'Flying', 'Bug', 
+    'Rock', 'Fairy'
+  ];
+
   // Individual artist stats with unique Pokemon focus
   const artistStats: ArtistStats[] = Object.keys(artistCount).map(artist => {
     const artistPokemon = pokemonData.filter(p => p.artist === artist);
     const artistUnique = artistPokemon.filter(p => p.unique && ['U0', 'U1', 'U2'].includes(p.unique));
     
-    // Type distribution for this artist's unique Pokemon only
+    // Type distribution for this artist's unique Pokemon only - include all types
     const uniqueTypeDistribution: { [key: string]: number } = {};
+    
+    // Initialize all types with 0
+    allPokemonTypes.forEach(type => {
+      uniqueTypeDistribution[type] = 0;
+    });
+    
+    // Count actual types
     artistUnique.forEach(p => {
       p.types.forEach(type => {
         uniqueTypeDistribution[type] = (uniqueTypeDistribution[type] || 0) + 1;
@@ -89,6 +106,27 @@ const Statistics = () => {
       uniqueTypeDistribution
     };
   }).sort((a, b) => b.totalPokemon - a.totalPokemon);
+
+  // Get suggestions for an artist based on their type distribution
+  const getArtistSuggestions = (typeDistribution: { [key: string]: number }) => {
+    const typeEntries = Object.entries(typeDistribution);
+    const maxCount = Math.max(...typeEntries.map(([_, count]) => count));
+    const minCount = Math.min(...typeEntries.map(([_, count]) => count));
+    
+    // Find types with highest count (should do less of)
+    const mostUsedTypes = typeEntries.filter(([_, count]) => count === maxCount);
+    // Find types with lowest count (should do more of)
+    const leastUsedTypes = typeEntries.filter(([_, count]) => count === minCount);
+    
+    // Randomly pick one from each if there are ties
+    const shouldDoLess = mostUsedTypes[Math.floor(Math.random() * mostUsedTypes.length)];
+    const shouldDoMore = leastUsedTypes[Math.floor(Math.random() * leastUsedTypes.length)];
+    
+    return {
+      doMore: shouldDoMore,
+      doLess: shouldDoLess
+    };
+  };
 
   // Get type colors for consistency
   const getTypeColor = (type: string, opacity = 0.8) => {
@@ -174,11 +212,10 @@ const Statistics = () => {
 
   const doughnutOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
-        labels: {
-          color: 'white',
-        },
+        display: false, // We'll create custom legend
       },
     },
   };
@@ -194,7 +231,7 @@ const Statistics = () => {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-white mb-4">LGDEX Statistics</h1>
+        <h1 className="text-4xl font-bold text-white mb-4">Statistics</h1>
         <p className="text-white/80">Complete overview of our Pokemon artwork collection</p>
       </div>
 
@@ -227,8 +264,9 @@ const Statistics = () => {
               <Palette className="text-purple-400" size={24} />
             </div>
           </div>
-          <div className="text-3xl font-bold text-white mb-1">{Object.keys(typeCount).length}</div>
-          <div className="text-white/70 text-sm">Unique Types</div>
+          <div className="text-3xl font-bold text-white mb-1">{uniquePokemonCount}</div>
+          <div className="text-white/70 text-sm">Unique Pokemon</div>
+          <div className="text-white/50 text-xs">Baseless Creations (U0/U1/U2)</div>
         </div>
       </div>
 
@@ -237,8 +275,29 @@ const Statistics = () => {
         {/* Type Distribution */}
         <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
           <h3 className="text-xl font-bold text-white mb-6">Pokemon Types Distribution</h3>
-          <div className="h-80">
-            <Doughnut data={typeChartData} options={doughnutOptions} />
+          <div className="flex items-center gap-6 h-80">
+            {/* Compact Legend on the Left */}
+            <div className="flex-shrink-0 w-32 flex flex-col justify-center">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                {Object.entries(typeCount).map(([type, count]) => (
+                  <div key={type} className="flex items-center space-x-1">
+                    <span 
+                      className="w-3 h-3 rounded-sm flex-shrink-0"
+                      style={{ backgroundColor: getTypeColor(type, 1) }}
+                    ></span>
+                    <div className="min-w-0">
+                      <div className="text-white text-xs truncate leading-tight">{type}</div>
+                      <div className="text-white/60 text-xs leading-tight">{count}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Larger Chart on the Right */}
+            <div className="flex-1 h-full">
+              <Doughnut data={typeChartData} options={doughnutOptions} />
+            </div>
           </div>
         </div>
 
@@ -254,73 +313,138 @@ const Statistics = () => {
       {/* Artist Individual Stats */}
       <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 mb-8">
         <h3 className="text-xl font-bold text-white mb-6">Individual Artist Statistics</h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {artistStats.map((stat) => (
-            <div key={stat.artist} className="bg-white/5 rounded-lg p-6">
-              <h4 className="text-lg font-semibold text-white mb-4">{stat.artist}</h4>
-              
-              {/* Artist Stats Grid */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <div className="text-white/60 text-sm">Total Pokemon</div>
-                  <div className="text-yellow-300 font-bold text-2xl">{stat.totalPokemon}</div>
-                </div>
-                <div>
-                  <div className="text-white/60 text-sm">Unique Pokemon</div>
-                  <div className="text-purple-300 font-bold text-2xl">{stat.uniquePokemon}</div>
-                </div>
-              </div>
-
-              {/* Unique Pokemon Type Distribution Chart */}
-              {stat.uniquePokemon > 0 && (
-                <div>
-                  <h5 className="text-white font-semibold mb-3">Unique Pokemon Type Distribution</h5>
-                  <div className="h-48">
-                    <Bar 
-                      data={{
-                        labels: Object.keys(stat.uniqueTypeDistribution),
-                        datasets: [
-                          {
-                            label: 'Unique Pokemon Count',
-                            data: Object.values(stat.uniqueTypeDistribution),
-                            backgroundColor: Object.keys(stat.uniqueTypeDistribution).map(type => getTypeColor(type)),
-                            borderColor: Object.keys(stat.uniqueTypeDistribution).map(type => getTypeColor(type, 1)),
-                            borderWidth: 1,
-                          },
-                        ],
-                      }}
-                      options={{
-                        ...chartOptions,
-                        plugins: {
-                          ...chartOptions.plugins,
-                          legend: {
-                            display: false,
-                          },
-                        },
-                        scales: {
-                          ...chartOptions.scales,
-                          y: {
-                            ...chartOptions.scales.y,
-                            beginAtZero: true,
-                            ticks: {
-                              ...chartOptions.scales.y.ticks,
-                              stepSize: 1,
-                            },
-                          },
-                        },
-                      }}
-                    />
+        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+          {artistStats.map((stat) => {
+            const suggestions = getArtistSuggestions(stat.uniqueTypeDistribution);
+            
+            return (
+              <div key={stat.artist} className="bg-white/5 rounded-lg p-6">
+                <h4 className="text-lg font-semibold text-white mb-4">{stat.artist}</h4>
+                
+                {/* Artist Stats Grid */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <div className="text-white/60 text-sm">Total Pokemon</div>
+                    <div className="text-yellow-300 font-bold text-2xl">{stat.totalPokemon}</div>
+                  </div>
+                  <div>
+                    <div className="text-white/60 text-sm">Unique Pokemon</div>
+                    <div className="text-purple-300 font-bold text-2xl">{stat.uniquePokemon}</div>
                   </div>
                 </div>
-              )}
-              
-              {stat.uniquePokemon === 0 && (
-                <div className="text-white/50 text-center py-4">
-                  No unique Pokemon yet
-                </div>
-              )}
-            </div>
-          ))}
+
+                {/* Unique Pokemon Type Distribution Chart and Suggestions */}
+                {stat.uniquePokemon > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    {/* Chart */}
+                    <div className="lg:col-span-3">
+                      <h5 className="text-white font-semibold mb-3">Unique Pokemon Type Distribution</h5>
+                      <div className="h-64">
+                        <Bar 
+                          data={{
+                            labels: allPokemonTypes,
+                            datasets: [
+                              {
+                                label: 'Unique Pokemon Count',
+                                data: allPokemonTypes.map(type => stat.uniqueTypeDistribution[type] || 0),
+                                backgroundColor: allPokemonTypes.map(type => getTypeColor(type)),
+                                borderColor: allPokemonTypes.map(type => getTypeColor(type, 1)),
+                                borderWidth: 1,
+                              },
+                            ],
+                          }}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: {
+                                display: false,
+                              },
+                            },
+                            scales: {
+                              y: {
+                                beginAtZero: true,
+                                ticks: {
+                                  color: 'white',
+                                  stepSize: 1,
+                                },
+                                grid: {
+                                  color: 'rgba(255, 255, 255, 0.2)',
+                                },
+                              },
+                              x: {
+                                ticks: {
+                                  color: 'white',
+                                  maxRotation: 45,
+                                  minRotation: 45,
+                                  font: {
+                                    size: 10,
+                                  },
+                                },
+                                grid: {
+                                  color: 'rgba(255, 255, 255, 0.2)',
+                                },
+                              },
+                            },
+                          }}
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Suggestions */}
+                    <div className="lg:col-span-1">
+                      <h5 className="text-white font-semibold mb-3">Suggestions</h5>
+                      <div className="space-y-4">
+                        {/* Do More Of */}
+                        <div className="bg-green-500/20 border border-green-500/40 rounded-lg p-3">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <TrendingUp className="text-green-400" size={16} />
+                            <span className="text-green-300 text-sm font-semibold">Try More</span>
+                          </div>
+                          <div className="text-white text-sm">
+                            <span 
+                              className={`inline-block w-3 h-3 rounded-full mr-2`}
+                              style={{ backgroundColor: getTypeColor(suggestions.doMore[0], 1) }}
+                            ></span>
+                            {suggestions.doMore[0]}
+                          </div>
+                          <div className="text-white/60 text-xs mt-1">
+                            Current: {suggestions.doMore[1]}
+                          </div>
+                        </div>
+                        
+                        {/* Do Less Of */}
+                        {suggestions.doLess[1] > 0 && (
+                          <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <TrendingDown className="text-red-400" size={16} />
+                              <span className="text-red-300 text-sm font-semibold">Maybe Less</span>
+                            </div>
+                            <div className="text-white text-sm">
+                              <span 
+                                className={`inline-block w-3 h-3 rounded-full mr-2`}
+                                style={{ backgroundColor: getTypeColor(suggestions.doLess[0], 1) }}
+                              ></span>
+                              {suggestions.doLess[0]}
+                            </div>
+                            <div className="text-white/60 text-xs mt-1">
+                              Current: {suggestions.doLess[1]}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {stat.uniquePokemon === 0 && (
+                  <div className="text-white/50 text-center py-4">
+                    No unique Pokemon yet
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 

@@ -22,4 +22,10 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const auth = getAuth(app);
 
+// Add some debugging
+console.log('Firebase initialized with config:', {
+  projectId: firebaseConfig.projectId,
+  storageBucket: firebaseConfig.storageBucket
+});
+
 export default app;
