@@ -110,21 +110,21 @@ const Statistics = () => {
   // Get suggestions for an artist based on their type distribution
   const getArtistSuggestions = (typeDistribution: { [key: string]: number }) => {
     const typeEntries = Object.entries(typeDistribution);
-    const maxCount = Math.max(...typeEntries.map(([_, count]) => count));
-    const minCount = Math.min(...typeEntries.map(([_, count]) => count));
     
-    // Find types with highest count (should do less of)
-    const mostUsedTypes = typeEntries.filter(([_, count]) => count === maxCount);
-    // Find types with lowest count (should do more of)
-    const leastUsedTypes = typeEntries.filter(([_, count]) => count === minCount);
+    // Sort by count to get the distribution
+    const sortedByCount = typeEntries.sort((a, b) => a[1] - b[1]);
     
-    // Randomly pick one from each if there are ties
-    const shouldDoLess = mostUsedTypes[Math.floor(Math.random() * mostUsedTypes.length)];
-    const shouldDoMore = leastUsedTypes[Math.floor(Math.random() * leastUsedTypes.length)];
+    // Get the lowest 2-3 types (should do more of)
+    const lowestCounts = sortedByCount.slice(0, Math.min(3, sortedByCount.length));
+    const shouldDoMore = lowestCounts.filter(([_, count]) => count <= Math.min(2, Math.max(...typeEntries.map(([_, c]) => c))));
+    
+    // Get the highest 2-3 types (should do less of) - only if they have more than 0
+    const highestCounts = sortedByCount.slice(-3).reverse();
+    const shouldDoLess = highestCounts.filter(([_, count]) => count > 0 && count >= Math.max(1, Math.max(...typeEntries.map(([_, c]) => c)) - 1));
     
     return {
-      doMore: shouldDoMore,
-      doLess: shouldDoLess
+      doMore: shouldDoMore.slice(0, 3), // Limit to 3
+      doLess: shouldDoLess.slice(0, 3)  // Limit to 3
     };
   };
 
@@ -396,40 +396,53 @@ const Statistics = () => {
                       <h5 className="text-white font-semibold mb-3">Suggestions</h5>
                       <div className="space-y-4">
                         {/* Do More Of */}
-                        <div className="bg-green-500/20 border border-green-500/40 rounded-lg p-3">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <TrendingUp className="text-green-400" size={16} />
-                            <span className="text-green-300 text-sm font-semibold">Try More</span>
+                        {suggestions.doMore.length > 0 && (
+                          <div className="bg-green-500/20 border border-green-500/40 rounded-lg p-3">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <TrendingUp className="text-green-400" size={16} />
+                              <span className="text-green-300 text-sm font-semibold">Try More</span>
+                            </div>
+                            <div className="space-y-1">
+                              {suggestions.doMore.map(([type, count]) => (
+                                <div key={type} className="text-white text-sm">
+                                  <span 
+                                    className={`inline-block w-3 h-3 rounded-full mr-2`}
+                                    style={{ backgroundColor: getTypeColor(type, 1) }}
+                                  ></span>
+                                  {type}
+                                  <span className="text-white/60 text-xs ml-2">({count})</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                          <div className="text-white text-sm">
-                            <span 
-                              className={`inline-block w-3 h-3 rounded-full mr-2`}
-                              style={{ backgroundColor: getTypeColor(suggestions.doMore[0], 1) }}
-                            ></span>
-                            {suggestions.doMore[0]}
-                          </div>
-                          <div className="text-white/60 text-xs mt-1">
-                            Current: {suggestions.doMore[1]}
-                          </div>
-                        </div>
+                        )}
                         
                         {/* Do Less Of */}
-                        {suggestions.doLess[1] > 0 && (
+                        {suggestions.doLess.length > 0 && suggestions.doLess.some(([_, count]) => count > 0) && (
                           <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
                             <div className="flex items-center space-x-2 mb-2">
                               <TrendingDown className="text-red-400" size={16} />
                               <span className="text-red-300 text-sm font-semibold">Maybe Less</span>
                             </div>
-                            <div className="text-white text-sm">
-                              <span 
-                                className={`inline-block w-3 h-3 rounded-full mr-2`}
-                                style={{ backgroundColor: getTypeColor(suggestions.doLess[0], 1) }}
-                              ></span>
-                              {suggestions.doLess[0]}
+                            <div className="space-y-1">
+                              {suggestions.doLess.filter(([_, count]) => count > 0).map(([type, count]) => (
+                                <div key={type} className="text-white text-sm">
+                                  <span 
+                                    className={`inline-block w-3 h-3 rounded-full mr-2`}
+                                    style={{ backgroundColor: getTypeColor(type, 1) }}
+                                  ></span>
+                                  {type}
+                                  <span className="text-white/60 text-xs ml-2">({count})</span>
+                                </div>
+                              ))}
                             </div>
-                            <div className="text-white/60 text-xs mt-1">
-                              Current: {suggestions.doLess[1]}
-                            </div>
+                          </div>
+                        )}
+                        
+                        {/* No suggestions message */}
+                        {suggestions.doMore.length === 0 && suggestions.doLess.length === 0 && (
+                          <div className="bg-blue-500/20 border border-blue-500/40 rounded-lg p-3 text-center">
+                            <span className="text-blue-300 text-sm">Perfect balance! 🎯</span>
                           </div>
                         )}
                       </div>

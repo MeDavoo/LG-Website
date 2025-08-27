@@ -280,6 +280,44 @@ const Home = () => {
     }
   };
 
+  // Handle paste for Add form
+  const handleAddImagePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          // Check file size (limit to 5MB)
+          if (file.size > 5 * 1024 * 1024) {
+            showNotification('Image size should be less than 5MB', 'error');
+            return;
+          }
+          setAddFormData(prev => ({ ...prev, image: file }));
+          showNotification('✅ Image pasted from clipboard!', 'success');
+        }
+      }
+    }
+  };
+
+  // Handle paste for Edit form
+  const handleEditImagePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          // Check file size (limit to 5MB)
+          if (file.size > 5 * 1024 * 1024) {
+            showNotification('Image size should be less than 5MB', 'error');
+            return;
+          }
+          setEditFormData(prev => ({ ...prev, image: file }));
+          showNotification('✅ Image pasted from clipboard!', 'success');
+        }
+      }
+    }
+  }; 
+
   // Position Editor Functions
   const handleDragStart = (pokemon: PokemonSlot) => {
     if (!isPositionEditorMode) return;
@@ -1141,8 +1179,10 @@ const Home = () => {
               </div>
 
               {/* Current Image Preview & New Image Upload */}
-              <div>
-                <label className="block text-white font-semibold mb-2">Pokemon Image</label>
+              <div onPaste={handleEditImagePaste} tabIndex={0} className="outline-none">
+                <label className="block text-white font-semibold mb-2">
+                  Pokemon Image <span className="text-xs text-white/60">(Upload or paste new image)</span>
+                </label>
                 
                 {/* Current Image */}
                 {selectedPokemon?.imageUrl && (
@@ -1173,7 +1213,7 @@ const Home = () => {
                     </p>
                   )}
                   <p className="text-white/40 text-xs mt-1">
-                    Max size: 5MB. Supported formats: JPG, PNG, GIF, WebP
+                    You can paste an image here (Ctrl+V or Cmd+V) or click to browse files. Max size: 5MB.
                   </p>
                 </div>
               </div>
@@ -1346,8 +1386,10 @@ const Home = () => {
               </div>
 
               {/* Image Upload */}
-              <div>
-                <label className="block text-white font-semibold mb-2">Pokemon Image *</label>
+              <div onPaste={handleAddImagePaste} tabIndex={0} className="outline-none">
+                <label className="block text-white font-semibold mb-2">
+                  Pokemon Image * <span className="text-xs text-white/60">(Upload or paste)</span>
+                </label>
                 <input
                   type="file"
                   accept="image/*"
@@ -1359,6 +1401,9 @@ const Home = () => {
                     ✅ {addFormData.image.name} selected
                   </p>
                 )}
+                <p className="text-white/40 text-xs mt-1">
+                  You can paste an image here (Ctrl+V or Cmd+V) or click to browse files
+                </p>
               </div>
 
               {/* Types Selection */}
