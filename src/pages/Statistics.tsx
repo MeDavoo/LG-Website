@@ -36,6 +36,7 @@ const Statistics = () => {
   const [artistRankings, setArtistRankings] = useState<{ 
     [artist: string]: { pokemonId: string; rank: number; totalPoints: number; pokemon: Pokemon }[] 
   }>({});
+  const [selectedArtist, setSelectedArtist] = useState<string>(''); // New state for selected artist tab
 
   useEffect(() => {
     loadPokemonData();
@@ -124,6 +125,13 @@ const Statistics = () => {
       uniqueTypeDistribution
     };
   }).sort((a, b) => b.totalPokemon - a.totalPokemon);
+
+  // Set first artist as selected when data loads
+  useEffect(() => {
+    if (artistStats.length > 0 && !selectedArtist) {
+      setSelectedArtist(artistStats[0].artist);
+    }
+  }, [artistStats, selectedArtist]);
 
   // Get suggestions for an artist based on their type distribution
   const getArtistSuggestions = (typeDistribution: { [key: string]: number }) => {
@@ -328,288 +336,313 @@ const Statistics = () => {
         </div>
       </div>
 
-      {/* Artist Individual Stats */}
+      {/* Artist Individual Stats - Tabbed Interface */}
       <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 mb-8">
         <h3 className="text-xl font-bold text-white mb-6">Individual Artist Statistics</h3>
-        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-          {artistStats.map((stat) => {
-            const suggestions = getArtistSuggestions(stat.uniqueTypeDistribution);
-            
-            return (
-              <div key={stat.artist} className="bg-white/5 rounded-lg p-6">
-                <h4 className="text-lg font-semibold text-white mb-4">{stat.artist}</h4>
-                
-                {/* Artist Stats Grid */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <div className="text-white/60 text-sm">Total Pokemon</div>
-                    <div className="text-yellow-300 font-bold text-2xl">{stat.totalPokemon}</div>
-                  </div>
-                  <div>
-                    <div className="text-white/60 text-sm">Unique Pokemon</div>
-                    <div className="text-purple-300 font-bold text-2xl">{stat.uniquePokemon}</div>
-                  </div>
-                </div>
+        
+        {/* Artist Tabs */}
+        <div className="flex flex-wrap gap-2 mb-6 border-b border-white/20 pb-4">
+          {artistStats.map((stat) => (
+            <button
+              key={stat.artist}
+              onClick={() => setSelectedArtist(stat.artist)}
+              className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium ${
+                selectedArtist === stat.artist
+                  ? 'bg-yellow-400 text-black'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              {stat.artist}
+              <span className="ml-2 text-xs opacity-70">
+                ({stat.totalPokemon})
+              </span>
+            </button>
+          ))}
+        </div>
 
-                {/* Unique Pokemon Type Distribution Chart and Suggestions */}
-                {stat.uniquePokemon > 0 && (
-                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    {/* Chart */}
-                    <div className="lg:col-span-3">
-                      <h5 className="text-white font-semibold mb-3">Unique Pokemon Type Distribution</h5>
-                      <div className="h-64">
-                        <Bar 
-                          data={{
-                            labels: allPokemonTypes,
-                            datasets: [
-                              {
-                                label: 'Unique Pokemon Count',
-                                data: allPokemonTypes.map(type => stat.uniqueTypeDistribution[type] || 0),
-                                backgroundColor: allPokemonTypes.map(type => getTypeColor(type)),
-                                borderColor: allPokemonTypes.map(type => getTypeColor(type, 1)),
-                                borderWidth: 1,
-                              },
-                            ],
-                          }}
-                          options={{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                              legend: {
-                                display: false,
-                              },
-                            },
-                            scales: {
-                              y: {
-                                beginAtZero: true,
-                                ticks: {
-                                  color: 'white',
-                                  stepSize: 1,
+        {/* Selected Artist Content */}
+        {selectedArtist && artistStats.find(stat => stat.artist === selectedArtist) && (
+          <div className="bg-white/5 rounded-lg p-6">
+            {(() => {
+              const stat = artistStats.find(s => s.artist === selectedArtist)!;
+              const suggestions = getArtistSuggestions(stat.uniqueTypeDistribution);
+              
+              return (
+                <>
+                  <h4 className="text-lg font-semibold text-white mb-4">{stat.artist}</h4>
+                  
+                  {/* Artist Stats Grid */}
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <div className="text-white/60 text-sm">Total Pokemon</div>
+                      <div className="text-yellow-300 font-bold text-2xl">{stat.totalPokemon}</div>
+                    </div>
+                    <div>
+                      <div className="text-white/60 text-sm">Unique Pokemon</div>
+                      <div className="text-purple-300 font-bold text-2xl">{stat.uniquePokemon}</div>
+                    </div>
+                  </div>
+
+                  {/* Unique Pokemon Type Distribution Chart and Suggestions */}
+                  {stat.uniquePokemon > 0 && (
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                      {/* Chart */}
+                      <div className="lg:col-span-3">
+                        <h5 className="text-white font-semibold mb-3">Unique Pokemon Type Distribution</h5>
+                        <div className="h-64">
+                          <Bar 
+                            data={{
+                              labels: allPokemonTypes,
+                              datasets: [
+                                {
+                                  label: 'Unique Pokemon Count',
+                                  data: allPokemonTypes.map(type => stat.uniqueTypeDistribution[type] || 0),
+                                  backgroundColor: allPokemonTypes.map(type => getTypeColor(type)),
+                                  borderColor: allPokemonTypes.map(type => getTypeColor(type, 1)),
+                                  borderWidth: 1,
                                 },
-                                grid: {
-                                  color: 'rgba(255, 255, 255, 0.2)',
+                              ],
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              plugins: {
+                                legend: {
+                                  display: false,
                                 },
                               },
-                              x: {
-                                ticks: {
-                                  color: 'white',
-                                  maxRotation: 45,
-                                  minRotation: 45,
-                                  font: {
-                                    size: 10,
+                              scales: {
+                                y: {
+                                  beginAtZero: true,
+                                  ticks: {
+                                    color: 'white',
+                                    stepSize: 1,
+                                  },
+                                  grid: {
+                                    color: 'rgba(255, 255, 255, 0.2)',
                                   },
                                 },
-                                grid: {
-                                  color: 'rgba(255, 255, 255, 0.2)',
+                                x: {
+                                  ticks: {
+                                    color: 'white',
+                                    maxRotation: 45,
+                                    minRotation: 45,
+                                    font: {
+                                      size: 10,
+                                    },
+                                  },
+                                  grid: {
+                                    color: 'rgba(255, 255, 255, 0.2)',
+                                  },
                                 },
                               },
-                            },
-                          }}
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Suggestions */}
-                    <div className="lg:col-span-1">
-                      <h5 className="text-white font-semibold mb-3">Suggestions</h5>
-                      <div className="space-y-4">
-                        {/* Do More Of */}
-                        {suggestions.doMore.length > 0 && (
-                          <div className="bg-green-500/20 border border-green-500/40 rounded-lg p-3">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <TrendingUp className="text-green-400" size={16} />
-                              <span className="text-green-300 text-sm font-semibold">Try More</span>
-                            </div>
-                            <div className="space-y-1">
-                              {suggestions.doMore.map(([type, count]) => (
-                                <div key={type} className="text-white text-sm">
-                                  <span 
-                                    className={`inline-block w-3 h-3 rounded-full mr-2`}
-                                    style={{ backgroundColor: getTypeColor(type, 1) }}
-                                  ></span>
-                                  {type}
-                                  <span className="text-white/60 text-xs ml-2">({count})</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Do Less Of */}
-                        {suggestions.doLess.length > 0 && suggestions.doLess.some(([_, count]) => count > 0) && (
-                          <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <TrendingDown className="text-red-400" size={16} />
-                              <span className="text-red-300 text-sm font-semibold">Maybe Less</span>
-                            </div>
-                            <div className="space-y-1">
-                              {suggestions.doLess.filter(([_, count]) => count > 0).map(([type, count]) => (
-                                <div key={type} className="text-white text-sm">
-                                  <span 
-                                    className={`inline-block w-3 h-3 rounded-full mr-2`}
-                                    style={{ backgroundColor: getTypeColor(type, 1) }}
-                                  ></span>
-                                  {type}
-                                  <span className="text-white/60 text-xs ml-2">({count})</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* No suggestions message */}
-                        {suggestions.doMore.length === 0 && suggestions.doLess.length === 0 && (
-                          <div className="bg-blue-500/20 border border-blue-500/40 rounded-lg p-3 text-center">
-                            <span className="text-blue-300 text-sm">Perfect balance! 🎯</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Artist Pokemon Rankings */}
-                {artistRankings[stat.artist] && artistRankings[stat.artist].length > 0 && (
-                  <div className="mt-6">
-                    <h5 className="text-white font-semibold mb-3 flex items-center">
-                      <Trophy className="mr-2 text-yellow-400" size={16} />
-                      Pokemon Rankings ({artistRankings[stat.artist].length})
-                    </h5>
-                    
-                    {/* Podium Display for Top 3 */}
-                    {artistRankings[stat.artist].length >= 3 && (
-                      <div className="mb-6 bg-gradient-to-b from-yellow-500/10 to-transparent rounded-lg p-8">
-                        <div className="flex items-end justify-center space-x-8 relative max-w-2xl mx-auto">
-                          {/* 2nd Place - Left */}
-                          <div className="flex flex-col items-center">
-                            <div className="relative mb-3">
-                              <img 
-                                src={artistRankings[stat.artist][1].pokemon.imageUrl} 
-                                alt={artistRankings[stat.artist][1].pokemon.name}
-                                className="w-24 h-24 object-contain filter drop-shadow-lg"
-                              />
-                              <div className="absolute -top-3 -right-3 bg-gray-300 text-black rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
-                                2
-                              </div>
-                            </div>
-                            <div className="bg-gray-300/20 rounded-t-lg w-28 h-14 flex items-center justify-center">
-                              <span className="text-gray-300 font-bold">2nd</span>
-                            </div>
-                          </div>
-                          
-                          {/* 1st Place - Center (Higher) */}
-                          <div className="flex flex-col items-center">
-                            <div className="relative mb-3">
-                              <img 
-                                src={artistRankings[stat.artist][0].pokemon.imageUrl} 
-                                alt={artistRankings[stat.artist][0].pokemon.name}
-                                className="w-32 h-32 object-contain filter drop-shadow-xl transform scale-110"
-                              />
-                              <div className="absolute -top-4 -right-4 bg-yellow-500 text-black rounded-full w-10 h-10 flex items-center justify-center text-lg font-bold">
-                                1
-                              </div>
-                            </div>
-                            <div className="bg-yellow-500/30 rounded-t-lg w-32 h-20 flex items-center justify-center">
-                              <span className="text-yellow-300 font-bold text-lg">1st</span>
-                            </div>
-                          </div>
-                          
-                          {/* 3rd Place - Right */}
-                          <div className="flex flex-col items-center">
-                            <div className="relative mb-3">
-                              <img 
-                                src={artistRankings[stat.artist][2].pokemon.imageUrl} 
-                                alt={artistRankings[stat.artist][2].pokemon.name}
-                                className="w-24 h-24 object-contain filter drop-shadow-lg"
-                              />
-                              <div className="absolute -top-3 -right-3 bg-amber-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
-                                3
-                              </div>
-                            </div>
-                            <div className="bg-amber-600/20 rounded-t-lg w-28 h-12 flex items-center justify-center">
-                              <span className="text-amber-400 font-bold">3rd</span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Pokemon Names Below Podium */}
-                        <div className="flex justify-center space-x-8 mt-4 max-w-2xl mx-auto">
-                          <div className="text-center w-28">
-                            <div className="text-gray-300 font-medium truncate">
-                              {artistRankings[stat.artist][1].pokemon.name}
-                            </div>
-                          </div>
-                          <div className="text-center w-32">
-                            <div className="text-yellow-300 font-bold text-lg truncate">
-                              {artistRankings[stat.artist][0].pokemon.name}
-                            </div>
-                          </div>
-                          <div className="text-center w-28">
-                            <div className="text-amber-400 font-medium truncate">
-                              {artistRankings[stat.artist][2].pokemon.name}
-                            </div>
-                          </div>
+                            }}
+                          />
                         </div>
                       </div>
-                    )}
-                    
-                    <div className="bg-white/5 rounded-lg p-4 max-h-64 overflow-y-auto">
-                      <div className="space-y-2">
-                        {artistRankings[stat.artist].slice(3).map((ranking, index) => (
-                          <div 
-                            key={ranking.pokemonId} 
-                            className="flex items-center justify-between bg-white/5 rounded p-3 hover:bg-white/10 transition-colors"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className={`
-                                flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm
-                                bg-white/20 text-white
-                              `}>
-                                {index + 4}
+                      
+                      {/* Suggestions */}
+                      <div className="lg:col-span-1">
+                        <h5 className="text-white font-semibold mb-3">Suggestions</h5>
+                        <div className="space-y-4">
+                          {/* Do More Of */}
+                          {suggestions.doMore.length > 0 && (
+                            <div className="bg-green-500/20 border border-green-500/40 rounded-lg p-3">
+                              <div className="flex items-center space-x-2 mb-2">
+                                <TrendingUp className="text-green-400" size={16} />
+                                <span className="text-green-300 text-sm font-semibold">Try More</span>
                               </div>
-                              <img 
-                                src={ranking.pokemon.imageUrl} 
-                                alt={ranking.pokemon.name}
-                                className="w-8 h-8 object-contain"
-                              />
-                              <div>
-                                <div className="text-white font-medium">
-                                  {ranking.pokemon.name}
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  {ranking.pokemon.types.map(type => (
+                              <div className="space-y-1">
+                                {suggestions.doMore.map(([type, count]) => (
+                                  <div key={type} className="text-white text-sm">
                                     <span 
-                                      key={type}
-                                      className="px-2 py-0.5 rounded text-xs font-medium text-white"
-                                      style={{ backgroundColor: getTypeColor(type, 0.8) }}
-                                    >
-                                      {type}
-                                    </span>
-                                  ))}
-                                </div>
+                                      className={`inline-block w-3 h-3 rounded-full mr-2`}
+                                      style={{ backgroundColor: getTypeColor(type, 1) }}
+                                    ></span>
+                                    {type}
+                                    <span className="text-white/60 text-xs ml-2">({count})</span>
+                                  </div>
+                                ))}
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="text-white/60 text-sm">
-                                Rank #{ranking.rank}
+                          )}
+                          
+                          {/* Do Less Of */}
+                          {suggestions.doLess.length > 0 && suggestions.doLess.some(([_, count]) => count > 0) && (
+                            <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
+                              <div className="flex items-center space-x-2 mb-2">
+                                <TrendingDown className="text-red-400" size={16} />
+                                <span className="text-red-300 text-sm font-semibold">Maybe Less</span>
+                              </div>
+                              <div className="space-y-1">
+                                {suggestions.doLess.filter(([_, count]) => count > 0).map(([type, count]) => (
+                                  <div key={type} className="text-white text-sm">
+                                    <span 
+                                      className={`inline-block w-3 h-3 rounded-full mr-2`}
+                                      style={{ backgroundColor: getTypeColor(type, 1) }}
+                                    ></span>
+                                    {type}
+                                    <span className="text-white/60 text-xs ml-2">({count})</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* No suggestions message */}
+                          {suggestions.doMore.length === 0 && suggestions.doLess.length === 0 && (
+                            <div className="bg-blue-500/20 border border-blue-500/40 rounded-lg p-3 text-center">
+                              <span className="text-blue-300 text-sm">Perfect balance! 🎯</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Artist Pokemon Rankings */}
+                  {artistRankings[stat.artist] && artistRankings[stat.artist].length > 0 && (
+                    <div className="mt-6">
+                      <h5 className="text-white font-semibold mb-3 flex items-center">
+                        <Trophy className="mr-2 text-yellow-400" size={16} />
+                        Pokemon Rankings ({artistRankings[stat.artist].length})
+                      </h5>
+                      
+                      {/* Podium Display for Top 3 */}
+                      {artistRankings[stat.artist].length >= 3 && (
+                        <div className="mb-6 bg-gradient-to-b from-yellow-500/10 to-transparent rounded-lg p-8">
+                          <div className="flex items-end justify-center space-x-8 relative max-w-2xl mx-auto">
+                            {/* 2nd Place - Left */}
+                            <div className="flex flex-col items-center">
+                              <div className="relative mb-3">
+                                <img 
+                                  src={artistRankings[stat.artist][1].pokemon.imageUrl} 
+                                  alt={artistRankings[stat.artist][1].pokemon.name}
+                                  className="w-24 h-24 object-contain filter drop-shadow-lg"
+                                />
+                                <div className="absolute -top-3 -right-3 bg-gray-300 text-black rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
+                                  2
+                                </div>
+                              </div>
+                              <div className="bg-gray-300/20 rounded-t-lg w-28 h-14 flex items-center justify-center">
+                                <span className="text-gray-300 font-bold">2nd</span>
+                              </div>
+                            </div>
+                            
+                            {/* 1st Place - Center (Higher) */}
+                            <div className="flex flex-col items-center">
+                              <div className="relative mb-3">
+                                <img 
+                                  src={artistRankings[stat.artist][0].pokemon.imageUrl} 
+                                  alt={artistRankings[stat.artist][0].pokemon.name}
+                                  className="w-32 h-32 object-contain filter drop-shadow-xl transform scale-110"
+                                />
+                                <div className="absolute -top-4 -right-4 bg-yellow-500 text-black rounded-full w-10 h-10 flex items-center justify-center text-lg font-bold">
+                                  1
+                                </div>
+                              </div>
+                              <div className="bg-yellow-500/30 rounded-t-lg w-32 h-20 flex items-center justify-center">
+                                <span className="text-yellow-300 font-bold text-lg">1st</span>
+                              </div>
+                            </div>
+                            
+                            {/* 3rd Place - Right */}
+                            <div className="flex flex-col items-center">
+                              <div className="relative mb-3">
+                                <img 
+                                  src={artistRankings[stat.artist][2].pokemon.imageUrl} 
+                                  alt={artistRankings[stat.artist][2].pokemon.name}
+                                  className="w-24 h-24 object-contain filter drop-shadow-lg"
+                                />
+                                <div className="absolute -top-3 -right-3 bg-amber-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
+                                  3
+                                </div>
+                              </div>
+                              <div className="bg-amber-600/20 rounded-t-lg w-28 h-12 flex items-center justify-center">
+                                <span className="text-amber-400 font-bold">3rd</span>
                               </div>
                             </div>
                           </div>
-                        ))}
+                          
+                          {/* Pokemon Names Below Podium */}
+                          <div className="flex justify-center space-x-8 mt-4 max-w-2xl mx-auto">
+                            <div className="text-center w-28">
+                              <div className="text-gray-300 font-medium truncate">
+                                {artistRankings[stat.artist][1].pokemon.name}
+                              </div>
+                            </div>
+                            <div className="text-center w-32">
+                              <div className="text-yellow-300 font-bold text-lg truncate">
+                                {artistRankings[stat.artist][0].pokemon.name}
+              </div>
+                            </div>
+                            <div className="text-center w-28">
+                              <div className="text-amber-400 font-medium truncate">
+                                {artistRankings[stat.artist][2].pokemon.name}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="bg-white/5 rounded-lg p-4 max-h-64 overflow-y-auto">
+                        <div className="space-y-2">
+                          {artistRankings[stat.artist].slice(3).map((ranking, index) => (
+                            <div 
+                              key={ranking.pokemonId} 
+                              className="flex items-center justify-between bg-white/5 rounded p-3 hover:bg-white/10 transition-colors"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <div className={`
+                                  flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm
+                                  bg-white/20 text-white
+                                `}>
+                                  {index + 4}
+                                </div>
+                                <img 
+                                  src={ranking.pokemon.imageUrl} 
+                                  alt={ranking.pokemon.name}
+                                  className="w-8 h-8 object-contain"
+                                />
+                                <div>
+                                  <div className="text-white font-medium">
+                                    {ranking.pokemon.name}
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    {ranking.pokemon.types.map(type => (
+                                      <span 
+                                        key={type}
+                                        className="px-2 py-0.5 rounded text-xs font-medium text-white"
+                                        style={{ backgroundColor: getTypeColor(type, 0.8) }}
+                                      >
+                                        {type}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-white/60 text-sm">
+                                  Rank #{ranking.rank}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-                
-                {stat.uniquePokemon === 0 && (
-                  <div className="text-white/50 text-center py-4">
-                    No unique Pokemon yet
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  )}
+                  
+                  {stat.uniquePokemon === 0 && (
+                    <div className="text-white/50 text-center py-4">
+                      No unique Pokemon yet
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
     </div>
