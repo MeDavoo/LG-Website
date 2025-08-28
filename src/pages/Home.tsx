@@ -411,6 +411,7 @@ const Home = () => {
   const [deletingPokemon, setDeletingPokemon] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [editFormData, setEditFormData] = useState({
     name: '',
     artist: '',
@@ -879,6 +880,7 @@ const Home = () => {
                           setSelectedPokemon(pokemon);
                           setShowDeleteConfirm(false); // Reset delete confirmation when selecting new Pokemon
                           setShowEditForm(false); // Reset edit form when selecting new Pokemon
+                          setShowActionsDropdown(false); // Reset actions dropdown when selecting new Pokemon
                         }
                       }}
                       className={`flex items-center p-2 m-1 rounded-lg border transition-all duration-200 animate-fade-in-up ${
@@ -1002,24 +1004,24 @@ const Home = () => {
                 {selectedPokemon && selectedPokemon.hasArt ? (
                   <div className="space-y-2">
                     {/* Large Image with 3D Effect */}
-                    <div className="w-4/5 aspect-square perspective-1000 flex items-center justify-center mx-auto">
+                    <div className="w-full mx-auto perspective-1000 flex items-center justify-center">
                       <div 
                         ref={imageRef}
                         onMouseMove={handleMouseMove}
                         onMouseLeave={handleMouseLeave}
-                        className="relative w-full h-full group cursor-pointer"
+                        className="relative w-full max-w-xl group cursor-pointer"
                         style={{ 
                           perspective: '1000px',
                         }}
                       >
                         {/* Circular Shadow Layer */}
                         <div 
-                          className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-4 w-3/4 h-6 bg-black/40 rounded-full blur-md opacity-60 group-hover:opacity-80 transition-all duration-300"
+                          className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-2 w-3/4 h-4 bg-black/40 rounded-full blur-md opacity-60 group-hover:opacity-80 transition-all duration-300"
                         ></div>
                         
                         {/* Main Image */}
                         <div
-                          className="relative w-full h-full rounded-lg overflow-hidden transform-gpu transition-transform duration-300 ease-out group-hover:scale-105"
+                          className="relative w-full rounded-lg overflow-hidden transform-gpu transition-transform duration-300 ease-out group-hover:scale-105"
                           style={{
                             transform: `rotateX(${imageTransform.rotateX}deg) rotateY(${imageTransform.rotateY}deg)`,
                             transformStyle: 'preserve-3d',
@@ -1028,7 +1030,7 @@ const Home = () => {
                           <img
                             src={selectedPokemon.imageUrl}
                             alt={selectedPokemon.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-auto object-contain max-h-[32rem]"
                           />
                         </div>
                       </div>
@@ -1069,51 +1071,71 @@ const Home = () => {
                     {/* Special Status and Evolution Stage - Horizontal Layout */}
                     <div className="grid"></div>
                     
-                    {/* Edit and Delete Pokemon Buttons - Only show for Pokemon with artwork */}
+                    {/* Actions Dropdown - Only show for Pokemon with artwork */}
                     {selectedPokemon.firebaseId && (
                       <div className="pt-2 border-t border-white/20">
-                        <div className="flex gap-1">
-                          {/* Edit Button (80% width) */}
-                          <button
-                            onClick={handleEditPokemon}
-                            className="flex-[4] px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold"
-                          >
-                            ✏️ Edit Pokemon
-                          </button>
-                          
-                          {/* Delete Button (20% width, emoji only) */}
-                          <button
-                            onClick={() => setShowDeleteConfirm(true)}
-                            className="flex-1 px-2 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-center"
-                            title="Delete Pokemon"
-                          >
-                            🗑️
-                          </button>
-                        </div>
+                        {/* Dropdown Toggle Button */}
+                        <button
+                          onClick={() => setShowActionsDropdown(!showActionsDropdown)}
+                          className="w-full px-2 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all duration-300 flex items-center justify-center"
+                          title="Toggle Actions"
+                        >
+                          <span className={`transform transition-transform duration-300 text-sm ${
+                            showActionsDropdown ? 'rotate-180' : 'rotate-0'
+                          }`}>
+                            ⏷
+                          </span>
+                        </button>
                         
-                        {/* Delete Confirmation Dialog */}
-                        {showDeleteConfirm && (
-                          <div className="mt-3 p-3 bg-red-500/20 border border-red-500/40 rounded-lg">
-                            <p className="text-white text-center text-sm mb-3">
-                              Are you sure you want to delete <strong>{selectedPokemon.name}</strong>?
-                            </p>
-                            <div className="flex gap-2">
+                        {/* Dropdown Content with Smooth Animation */}
+                        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                          showActionsDropdown ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                        }`}>
+                          <div className="pt-3">
+                            <div className="flex gap-1">
+                              {/* Edit Button (80% width) */}
                               <button
-                                onClick={() => setShowDeleteConfirm(false)}
-                                className="flex-1 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors font-semibold text-sm"
+                                onClick={handleEditPokemon}
+                                className="flex-[4] px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold transform hover:scale-[1.02]"
                               >
-                                Cancel
+                                ✏️ Edit Pokemon
                               </button>
+                              
+                              {/* Delete Button (20% width, emoji only) */}
                               <button
-                                onClick={handleDeletePokemon}
-                                disabled={deletingPokemon}
-                                className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm disabled:bg-red-400 disabled:cursor-not-allowed"
+                                onClick={() => setShowDeleteConfirm(true)}
+                                className="flex-1 px-2 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-center transform hover:scale-[1.02]"
+                                title="Delete Pokemon"
                               >
-                                {deletingPokemon ? 'Deleting...' : 'Delete'}
+                                🗑️
                               </button>
                             </div>
+                            
+                            {/* Delete Confirmation Dialog */}
+                            {showDeleteConfirm && (
+                              <div className="mt-3 p-3 bg-red-500/20 border border-red-500/40 rounded-lg animate-fade-in-up">
+                                <p className="text-white text-center text-sm mb-3">
+                                  Are you sure you want to delete <strong>{selectedPokemon.name}</strong>?
+                                </p>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => setShowDeleteConfirm(false)}
+                                    className="flex-1 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors font-semibold text-sm"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={handleDeletePokemon}
+                                    disabled={deletingPokemon}
+                                    className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm disabled:bg-red-400 disabled:cursor-not-allowed"
+                                  >
+                                    {deletingPokemon ? 'Deleting...' : 'Delete'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
                     )}
                   </div>
