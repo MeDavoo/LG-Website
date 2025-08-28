@@ -23,10 +23,32 @@ const Home = () => {
   // Create 151 Pokemon slots (like a Pokedex) from Firebase data
   const [pokemonSlots, setPokemonSlots] = useState<PokemonSlot[]>([]);
 
+  // Animation timing system
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [animationSpeedMultiplier, setAnimationSpeedMultiplier] = useState(1);
+
   // Load Pokemon data from Firebase
   useEffect(() => {
     loadPokemonData();
   }, []);
+
+  // Animation speed control system
+  useEffect(() => {
+    if (isInitialLoad) {
+      // Start with slow animations for initial load
+      const timer = setTimeout(() => {
+        // After 3 seconds, dramatically speed up animations
+        setAnimationSpeedMultiplier(0.01); // Make animations 100x faster
+        
+        // After another 2 seconds, mark initial load as complete
+        setTimeout(() => {
+          setIsInitialLoad(false);
+        }, 2000);
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isInitialLoad]);
 
   const loadPokemonData = async () => {
     try {
@@ -62,6 +84,11 @@ const Home = () => {
       }
       
       setPokemonSlots(slots);
+      
+      // If this is not the initial load, set fast animations immediately
+      if (!isInitialLoad) {
+        setAnimationSpeedMultiplier(0.01);
+      }
     } catch (error) {
       console.error('Error loading Pokemon data:', error);
     } finally {
@@ -897,7 +924,7 @@ const Home = () => {
                             }`
                       } ${isDragging && draggedPokemon?.id === pokemon.id ? 'opacity-50 scale-95' : ''}`}
                       style={{
-                        animationDelay: `${index * 0.05}s`
+                        animationDelay: `${index * (0.03 * animationSpeedMultiplier)}s`
                       }}
                     >
                       {/* Pokemon Number */}
