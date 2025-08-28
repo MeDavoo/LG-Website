@@ -38,7 +38,10 @@ const AdminPanel = ({ onPokemonAdded, onShowNotification }: AdminPanelProps = {}
   const evolutionStageOptions = [
     { value: 0, label: 'Base Form (Stage 0)' },
     { value: 1, label: 'First Evolution (Stage 1)' },
-    { value: 2, label: 'Second Evolution (Stage 2)' }
+    { value: 2, label: 'Second Evolution (Stage 2)' },
+    { value: 3, label: 'GMAX' },
+    { value: 4, label: 'Legendary' },
+    { value: 5, label: 'MEGA' }
   ];
 
   const handleAddPokemon = async () => {

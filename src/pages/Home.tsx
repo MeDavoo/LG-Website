@@ -11,7 +11,7 @@ interface PokemonSlot {
   type2?: string;
   hasArt: boolean;
   unique?: string; // U0, U1, U2 for unique Pokemon (0=no evolve, 1=evolves once, 2=evolves twice)
-  evolutionStage?: number; // 0, 1, 2 for evolution stages
+  evolutionStage?: number; // 0=base, 1=first evo, 2=second evo, 3=GMAX, 4=Legendary, 5=MEGA
   firebaseId?: string; // Firebase document ID for updates
 }
 
@@ -636,10 +636,12 @@ const Home = () => {
       
       // Load global rankings
       const rankings = await getGlobalRankings();
+      console.log('Global rankings loaded:', rankings);
       const rankingMap: { [pokemonId: string]: number } = {};
       rankings.forEach(ranking => {
         rankingMap[ranking.pokemonId] = ranking.rank;
       });
+      console.log('Ranking map:', rankingMap);
       setGlobalRankings(rankingMap);
       
       // Update localStorage with Firebase data
@@ -665,7 +667,7 @@ const Home = () => {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedArtists, setSelectedArtists] = useState<string[]>([]);
   const [uniqueOnly, setUniqueOnly] = useState(false);
-  const [evolutionFilter, setEvolutionFilter] = useState<'all' | 'stage0' | 'stage1' | 'stage2' | 'evolved'>('all'); // More granular evolution filtering
+  const [evolutionFilter, setEvolutionFilter] = useState<'all' | 'stage0' | 'stage1' | 'stage2' | 'gmax' | 'legendary' | 'mega' | 'evolved'>('all'); // Evolution filtering including new types
 
   // Get unique artists from the data
   // const allArtists = Array.from(new Set(pokemonSlots.filter(p => p.hasArt && p.artist).map(p => p.artist!)));
@@ -724,13 +726,22 @@ const Home = () => {
         return false; // Show only stage 0 (base forms)
       }
       if (evolutionFilter === 'stage1' && pokemon.evolutionStage !== 1) {
-        return false; // Show only stage 1 (middle forms)
+        return false; // Show only stage 1 (first evolution)
       }
       if (evolutionFilter === 'stage2' && pokemon.evolutionStage !== 2) {
-        return false; // Show only stage 2 (final forms)
+        return false; // Show only stage 2 (second evolution)
+      }
+      if (evolutionFilter === 'gmax' && pokemon.evolutionStage !== 3) {
+        return false; // Show only GMAX forms
+      }
+      if (evolutionFilter === 'legendary' && pokemon.evolutionStage !== 4) {
+        return false; // Show only Legendary forms
+      }
+      if (evolutionFilter === 'mega' && pokemon.evolutionStage !== 5) {
+        return false; // Show only MEGA forms
       }
       if (evolutionFilter === 'evolved' && pokemon.evolutionStage === 0) {
-        return false; // Hide stage 0 when showing evolved forms (stage 1 & 2)
+        return false; // Hide stage 0 when showing evolved forms (stage 1, 2, GMAX, Legendary, MEGA)
       }
     } else if (evolutionFilter !== 'all' && pokemon.evolutionStage === undefined) {
       return false; // Hide Pokemon without evolution stage data when filtering
@@ -961,13 +972,43 @@ const Home = () => {
                   </button>
                   <button
                     onClick={() => setEvolutionFilter(evolutionFilter === 'stage2' ? 'all' : 'stage2')}
-                    className={`px-2 py-1 rounded text-xs font-semibold transition-all col-span-2 ${
+                    className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
                       evolutionFilter === 'stage2'
                         ? 'bg-red-500 text-white'
                         : 'bg-white/20 text-white/80 hover:bg-white/30'
                     }`}
                   >
                     Stage 2
+                  </button>
+                  <button
+                    onClick={() => setEvolutionFilter(evolutionFilter === 'gmax' ? 'all' : 'gmax')}
+                    className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                      evolutionFilter === 'gmax'
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-white/20 text-white/80 hover:bg-white/30'
+                    }`}
+                  >
+                    GMAX
+                  </button>
+                  <button
+                    onClick={() => setEvolutionFilter(evolutionFilter === 'legendary' ? 'all' : 'legendary')}
+                    className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                      evolutionFilter === 'legendary'
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-white/20 text-white/80 hover:bg-white/30'
+                    }`}
+                  >
+                    Legendary
+                  </button>
+                  <button
+                    onClick={() => setEvolutionFilter(evolutionFilter === 'mega' ? 'all' : 'mega')}
+                    className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                      evolutionFilter === 'mega'
+                        ? 'bg-pink-500 text-white'
+                        : 'bg-white/20 text-white/80 hover:bg-white/30'
+                    }`}
+                  >
+                    MEGA
                   </button>
                 </div>
               </div>
@@ -1180,17 +1221,32 @@ const Home = () => {
                             <span>Empty</span>
                           </div>
                         )}
-                        {pokemon.unique && (
-                          <span className="bg-gray-500 text-white px-1.5 py-0.5 rounded text-xs font-bold">
-                            {pokemon.unique}
-                          </span>
+                        {pokemon.firebaseId && (
+                          globalRankings[pokemon.firebaseId] ? (
+                            <span className="bg-yellow-500 text-black px-1.5 py-0.5 rounded text-xs font-bold">
+                              #{globalRankings[pokemon.firebaseId]}
+                            </span>
+                          ) : (
+                            <span className="bg-gray-500 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                              Unranked
+                            </span>
+                          )
                         )}
                         {pokemon.evolutionStage !== undefined && (
                           <span className={`px-1.5 py-0.5 rounded text-xs font-bold text-white ${
                             pokemon.evolutionStage === 0 ? 'bg-green-500' :
-                            pokemon.evolutionStage === 1 ? 'bg-yellow-500' : 'bg-red-500'
+                            pokemon.evolutionStage === 1 ? 'bg-yellow-500' :
+                            pokemon.evolutionStage === 2 ? 'bg-red-500' :
+                            pokemon.evolutionStage === 3 ? 'bg-purple-500' :
+                            pokemon.evolutionStage === 4 ? 'bg-orange-500' :
+                            pokemon.evolutionStage === 5 ? 'bg-pink-500' : 'bg-gray-500'
                           }`}>
-                            Stage {pokemon.evolutionStage}
+                            {pokemon.evolutionStage === 0 ? 'Stage 0' :
+                             pokemon.evolutionStage === 1 ? 'Stage 1' :
+                             pokemon.evolutionStage === 2 ? 'Stage 2' :
+                             pokemon.evolutionStage === 3 ? 'GMAX' :
+                             pokemon.evolutionStage === 4 ? 'Legendary' :
+                             pokemon.evolutionStage === 5 ? 'MEGA' : `Stage ${pokemon.evolutionStage}`}
                           </span>
                         )}
                       </div>
@@ -1335,10 +1391,16 @@ const Home = () => {
                         ))}
                       </div>
                       <div className="text-center">
-                        {globalRankings[selectedPokemon.firebaseId!] && (
-                          <p className="text-yellow-300 text-sm font-semibold mt-1">
-                            Global Rank: #{globalRankings[selectedPokemon.firebaseId!]}
-                          </p>
+                        {selectedPokemon.firebaseId && (
+                          globalRankings[selectedPokemon.firebaseId] ? (
+                            <p className="text-yellow-300 text-sm font-semibold mt-1">
+                              Global Rank: #{globalRankings[selectedPokemon.firebaseId]}
+                            </p>
+                          ) : (
+                            <p className="text-gray-400 text-sm font-semibold mt-1">
+                              Unranked - No votes yet
+                            </p>
+                          )
                         )}
                       </div>
                     </div>
@@ -1593,11 +1655,14 @@ const Home = () => {
               {/* Evolution Stage */}
               <div>
                 <label className="block text-white font-semibold mb-2">Evolution Stage</label>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {[
                     { value: 0, label: 'Base Form (Stage 0)' },
                     { value: 1, label: 'First Evolution (Stage 1)' },
-                    { value: 2, label: 'Second Evolution (Stage 2)' }
+                    { value: 2, label: 'Second Evolution (Stage 2)' },
+                    { value: 3, label: 'GMAX' },
+                    { value: 4, label: 'Legendary' },
+                    { value: 5, label: 'MEGA' }
                   ].map((option) => (
                     <button
                       key={option.value}
@@ -1761,11 +1826,14 @@ const Home = () => {
               {/* Evolution Stage */}
               <div>
                 <label className="block text-white font-semibold mb-2">Evolution Stage</label>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {[
                     { value: 0, label: 'Base Form (Stage 0)' },
                     { value: 1, label: 'First Evolution (Stage 1)' },
-                    { value: 2, label: 'Second Evolution (Stage 2)' }
+                    { value: 2, label: 'Second Evolution (Stage 2)' },
+                    { value: 3, label: 'GMAX' },
+                    { value: 4, label: 'Legendary' },
+                    { value: 5, label: 'MEGA' }
                   ].map((option) => (
                     <button
                       key={option.value}

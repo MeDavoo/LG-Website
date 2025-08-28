@@ -20,7 +20,7 @@ export interface Pokemon {
   imageUrl: string;
   types: string[];
   unique?: string; // U0, U1, U2 for unique Pokemon
-  evolutionStage?: number; // 0, 1, 2 for evolution stages (0=base, 1=middle, 2=final)
+  evolutionStage?: number; // 0=base, 1=first evo, 2=second evo, 3=GMAX, 4=Legendary, 5=MEGA
   createdAt: Date;
   updatedAt: Date;
 }
