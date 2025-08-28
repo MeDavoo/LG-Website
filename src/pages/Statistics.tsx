@@ -11,7 +11,7 @@ import {
 } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Users, Image, Palette, TrendingUp, TrendingDown, Trophy } from 'lucide-react';
-import { getAllPokemon, Pokemon, getAllRatings, getArtistRankings } from '../services/pokemonService';
+import { getAllPokemon, Pokemon, getArtistRankings } from '../services/pokemonService';
 
 ChartJS.register(
   CategoryScale,
