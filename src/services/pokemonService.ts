@@ -435,6 +435,36 @@ export const getArtistRankings = async (artist: string): Promise<{ pokemonId: st
   }
 };
 
+// Reset all Pokemon ratings - DANGEROUS: This deletes ALL rating data!
+export const resetAllRatings = async (): Promise<boolean> => {
+  try {
+    console.log('🚨 RESETTING ALL POKEMON RATINGS...');
+    
+    // Get all rating documents
+    const ratingsQuery = query(collection(db, RATINGS_COLLECTION));
+    const ratingsSnapshot = await getDocs(ratingsQuery);
+    
+    if (ratingsSnapshot.empty) {
+      console.log('✅ No ratings found to delete.');
+      return true;
+    }
+    
+    console.log(`📊 Found ${ratingsSnapshot.docs.length} rating documents to delete...`);
+    
+    // Delete all rating documents
+    const deletePromises = ratingsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
+    
+    console.log('🎯 All Pokemon ratings have been reset to 0!');
+    console.log('💡 All voting data has been cleared.');
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Error resetting ratings:', error);
+    return false;
+  }
+};
+
 
 
 
