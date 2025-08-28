@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber } from '../services/pokemonService';
+import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber, saveRating, getAllRatings, getGlobalRankings } from '../services/pokemonService';
 import Navbar from '../components/Navbar';
 
 interface PokemonSlot {
@@ -439,6 +439,16 @@ const Home = () => {
   const [showEditForm, setShowEditForm] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
+
+  // Auto-select first Pokemon with artwork when data loads
+  useEffect(() => {
+    if (pokemonSlots.length > 0 && !selectedPokemon) {
+      const firstPokemonWithArt = pokemonSlots.find(pokemon => pokemon.hasArt);
+      if (firstPokemonWithArt) {
+        setSelectedPokemon(firstPokemonWithArt);
+      }
+    }
+  }, [pokemonSlots, selectedPokemon]);
   const [editFormData, setEditFormData] = useState({
     name: '',
     artist: '',
@@ -476,6 +486,34 @@ const Home = () => {
   const [imageTransform, setImageTransform] = useState({ rotateX: 0, rotateY: 0 });
   const imageRef = useRef<HTMLDivElement>(null);
 
+  // Rating System state
+  const [hoveredStar, setHoveredStar] = useState(0);
+  const [pokemonRatings, setPokemonRatings] = useState<{
+    [pokemonId: string]: {
+      averageRating: number;
+      totalVotes: number;
+      totalPoints: number;
+      ratings: { [deviceId: string]: number };
+    }
+  }>({});
+  const [globalRankings, setGlobalRankings] = useState<{ [pokemonId: string]: number }>({});
+
+  // Generate a unique device ID for rating system
+  const getDeviceId = () => {
+    let deviceId = localStorage.getItem('pokemon_device_id');
+    if (!deviceId) {
+      deviceId = 'device_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+      localStorage.setItem('pokemon_device_id', deviceId);
+    }
+    return deviceId;
+  };
+
+  // Get user's rating for a specific Pokemon
+  const getUserRating = (pokemonId: string): number => {
+    const deviceId = getDeviceId();
+    return pokemonRatings[pokemonId]?.ratings[deviceId] || 0;
+  };
+
   // Function to show notifications
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type, show: true });
@@ -504,6 +542,123 @@ const Home = () => {
   const handleMouseLeave = () => {
     setImageTransform({ rotateX: 0, rotateY: 0 });
   };
+
+  // Rating System Functions
+  const handleStarRating = async (pokemonId: string, rating: number) => {
+    const deviceId = getDeviceId();
+    
+    try {
+      // Update local state immediately for better UX
+      setPokemonRatings(prev => {
+        const currentRatings = prev[pokemonId] || { averageRating: 0, totalVotes: 0, totalPoints: 0, ratings: {} };
+        const newRatings = { ...currentRatings.ratings, [deviceId]: rating };
+        
+        // Calculate new average and total points using the points system
+        const totalRatings = Object.values(newRatings).reduce((sum, r) => sum + r, 0);
+        const totalVotes = Object.keys(newRatings).length;
+        const averageRating = totalVotes > 0 ? totalRatings / totalVotes : 0;
+        
+        // Calculate total points using the starsToPoints function
+        const starsToPoints = (stars: number): number => {
+          const pointMap: { [key: number]: number } = {
+            1: 10, 2: 15, 3: 21, 4: 28, 5: 36, 6: 45, 7: 55, 8: 66, 9: 78, 10: 91
+          };
+          return pointMap[stars] || 0;
+        };
+        const totalPoints = Object.values(newRatings).reduce((sum, r) => sum + starsToPoints(r), 0);
+        
+        return {
+          ...prev,
+          [pokemonId]: {
+            averageRating,
+            totalVotes,
+            totalPoints,
+            ratings: newRatings
+          }
+        };
+      });
+
+      // Save to Firebase
+      await saveRatingToFirebase(pokemonId, deviceId, rating);
+      
+      showNotification(`✨ Rated ${rating}/10 stars!`, 'success');
+    } catch (error) {
+      console.error('Error saving rating:', error);
+      showNotification('❌ Failed to save rating. Please try again.', 'error');
+    }
+  };
+
+  const saveRatingToFirebase = async (pokemonId: string, deviceId: string, rating: number) => {
+    try {
+      const success = await saveRating(pokemonId, deviceId, rating);
+      if (!success) {
+        throw new Error('Failed to save rating to Firebase');
+      }
+      
+      // Reload rankings after successful save
+      await loadRatings();
+      
+      // Also save to localStorage as backup
+      const localRatings = JSON.parse(localStorage.getItem('pokemon_ratings') || '{}');
+      if (!localRatings[pokemonId]) {
+        localRatings[pokemonId] = { ratings: {}, averageRating: 0, totalVotes: 0 };
+      }
+      localRatings[pokemonId].ratings[deviceId] = rating;
+      
+      // Calculate average for local storage
+      const ratings = Object.values(localRatings[pokemonId].ratings) as number[];
+      localRatings[pokemonId].averageRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
+      localRatings[pokemonId].totalVotes = ratings.length;
+      
+      localStorage.setItem('pokemon_ratings', JSON.stringify(localRatings));
+    } catch (error) {
+      // Fallback to localStorage if Firebase fails
+      const localRatings = JSON.parse(localStorage.getItem('pokemon_ratings') || '{}');
+      if (!localRatings[pokemonId]) {
+        localRatings[pokemonId] = { ratings: {}, averageRating: 0, totalVotes: 0 };
+      }
+      localRatings[pokemonId].ratings[deviceId] = rating;
+      
+      const ratings = Object.values(localRatings[pokemonId].ratings) as number[];
+      localRatings[pokemonId].averageRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
+      localRatings[pokemonId].totalVotes = ratings.length;
+      
+      localStorage.setItem('pokemon_ratings', JSON.stringify(localRatings));
+      throw error;
+    }
+  };
+
+  const loadRatings = async () => {
+    try {
+      // Try to load from Firebase first
+      const firebaseRatings = await getAllRatings();
+      setPokemonRatings(firebaseRatings);
+      
+      // Load global rankings
+      const rankings = await getGlobalRankings();
+      const rankingMap: { [pokemonId: string]: number } = {};
+      rankings.forEach(ranking => {
+        rankingMap[ranking.pokemonId] = ranking.rank;
+      });
+      setGlobalRankings(rankingMap);
+      
+      // Update localStorage with Firebase data
+      localStorage.setItem('pokemon_ratings', JSON.stringify(firebaseRatings));
+    } catch (error) {
+      console.error('Error loading ratings from Firebase:', error);
+      
+      // Fallback to localStorage
+      const savedRatings = localStorage.getItem('pokemon_ratings');
+      if (savedRatings) {
+        setPokemonRatings(JSON.parse(savedRatings));
+      }
+    }
+  };
+
+  // Load ratings when component mounts
+  useEffect(() => {
+    loadRatings();
+  }, []);
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -583,6 +738,39 @@ const Home = () => {
     
     return true;
   });
+
+  // Navigation functions
+  const navigatePrevious = () => {
+    if (!selectedPokemon) return;
+    
+    const currentIndex = filteredPokemon.findIndex(p => p.id === selectedPokemon.id);
+    if (currentIndex > 0) {
+      setSelectedPokemon(filteredPokemon[currentIndex - 1]);
+    }
+  };
+
+  const navigateNext = () => {
+    if (!selectedPokemon) return;
+    
+    const currentIndex = filteredPokemon.findIndex(p => p.id === selectedPokemon.id);
+    if (currentIndex < filteredPokemon.length - 1) {
+      setSelectedPokemon(filteredPokemon[currentIndex + 1]);
+    }
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        navigatePrevious();
+      } else if (e.key === 'ArrowRight') {
+        navigateNext();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [selectedPokemon, filteredPokemon]);
 
   const getTypeColor = (type: string) => {
     const colors: { [key: string]: string } = {
@@ -1030,13 +1218,26 @@ const Home = () => {
               <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-3 animate-filter-item" style={{animationDelay: '0.5s'}}>
                 {selectedPokemon && selectedPokemon.hasArt ? (
                   <div className="space-y-2">
-                    {/* Large Image with 3D Effect */}
-                    <div className="w-full mx-auto perspective-1000 flex items-center justify-center">
+                    {/* Large Image with 3D Effect and Navigation */}
+                    <div className="w-full mx-auto perspective-1000 flex items-center justify-center relative">
+                      {/* Previous Arrow */}
+                      <button
+                        onClick={navigatePrevious}
+                        disabled={!selectedPokemon || filteredPokemon.findIndex(p => p.id === selectedPokemon.id) === 0}
+                        className="absolute left-0 top-1/2 transform -translate-y-1/2 z-10 bg-white/20 hover:bg-white/30 disabled:bg-gray-500/20 disabled:cursor-not-allowed backdrop-blur-md rounded-full p-3 transition-all duration-200 group"
+                        title="Previous Pokemon (Left Arrow)"
+                      >
+                        <svg className="w-6 h-6 text-white group-disabled:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+
+                      {/* Main Image Container */}
                       <div 
                         ref={imageRef}
                         onMouseMove={handleMouseMove}
                         onMouseLeave={handleMouseLeave}
-                        className="relative w-full max-w-xl group cursor-pointer"
+                        className="relative w-full max-w-xl group cursor-pointer mx-16"
                         style={{ 
                           perspective: '1000px',
                         }}
@@ -1061,6 +1262,18 @@ const Home = () => {
                           />
                         </div>
                       </div>
+
+                      {/* Next Arrow */}
+                      <button
+                        onClick={navigateNext}
+                        disabled={!selectedPokemon || filteredPokemon.findIndex(p => p.id === selectedPokemon.id) === filteredPokemon.length - 1}
+                        className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-white/20 hover:bg-white/30 disabled:bg-gray-500/20 disabled:cursor-not-allowed backdrop-blur-md rounded-full p-3 transition-all duration-200 group"
+                        title="Next Pokemon (Right Arrow)"
+                      >
+                        <svg className="w-6 h-6 text-white group-disabled:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
                     </div>
                     
                     {/* Pokemon Number */}
@@ -1094,6 +1307,41 @@ const Home = () => {
                     <p className="text-white/80 text-center text-sm">
                       Created by <span className="text-yellow-300 font-semibold">{selectedPokemon.artist}</span>
                     </p>
+                    
+                    {/* Star Rating System */}
+                    <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10">
+                      <div className="flex justify-center items-center space-x-1 mb-2">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
+                          <button
+                            key={star}
+                            onClick={() => handleStarRating(selectedPokemon.firebaseId!, star)}
+                            onMouseEnter={() => setHoveredStar(star)}
+                            onMouseLeave={() => setHoveredStar(0)}
+                            className="p-1 transition-all duration-200 transform hover:scale-110"
+                            title={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                          >
+                            <svg
+                              className={`w-6 h-6 transition-all duration-200 ${
+                                star <= (hoveredStar || getUserRating(selectedPokemon.firebaseId!))
+                                  ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(255,255,0,0.8)]'
+                                  : 'text-gray-400'
+                              }`}
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="text-center">
+                        {globalRankings[selectedPokemon.firebaseId!] && (
+                          <p className="text-yellow-300 text-sm font-semibold mt-1">
+                            Global Rank: #{globalRankings[selectedPokemon.firebaseId!]}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                     
                     {/* Special Status and Evolution Stage - Horizontal Layout */}
                     <div className="grid"></div>

@@ -7,7 +7,7 @@ import {
   deleteDoc, 
   query, 
   orderBy, 
-  where 
+  where
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
@@ -262,6 +262,175 @@ export const getUniquePokemon = async (): Promise<Pokemon[]> => {
     })) as Pokemon[];
   } catch (error) {
     console.error('Error fetching unique Pokemon:', error);
+    return [];
+  }
+};
+
+// Rating System Interfaces and Functions
+export interface PokemonRating {
+  pokemonId: string;
+  ratings: { [deviceId: string]: number }; // Device ID -> Rating (1-10)
+  averageRating: number;
+  totalVotes: number;
+  totalPoints: number; // New: Total points based on rating system
+  lastUpdated: any; // Firebase Timestamp or Date
+}
+
+const RATINGS_COLLECTION = 'pokemon_ratings';
+
+// Convert star rating to points using a progressive system
+export const starsToPoints = (stars: number): number => {
+  const pointMap: { [key: number]: number } = {
+    1: 10,
+    2: 15,
+    3: 21,
+    4: 28,
+    5: 36,
+    6: 45,
+    7: 55,
+    8: 66,
+    9: 78,
+    10: 91
+  };
+  return pointMap[stars] || 0;
+};
+
+// Save or update a rating for a Pokemon
+export const saveRating = async (pokemonId: string, deviceId: string, rating: number): Promise<boolean> => {
+  try {
+    // Get existing rating document for this Pokemon
+    const ratingsQuery = query(collection(db, RATINGS_COLLECTION), where('pokemonId', '==', pokemonId));
+    const ratingsSnapshot = await getDocs(ratingsQuery);
+    
+    if (ratingsSnapshot.empty) {
+      // Create new rating document
+      const newRatingData: Omit<PokemonRating, 'id'> = {
+        pokemonId,
+        ratings: { [deviceId]: rating },
+        averageRating: rating,
+        totalVotes: 1,
+        totalPoints: starsToPoints(rating),
+        lastUpdated: new Date()
+      };
+      
+      await addDoc(collection(db, RATINGS_COLLECTION), newRatingData);
+    } else {
+      // Update existing rating document
+      const ratingDoc = ratingsSnapshot.docs[0];
+      const currentData = ratingDoc.data() as PokemonRating;
+      const updatedRatings = { ...currentData.ratings, [deviceId]: rating };
+      
+      // Calculate new average and total points
+      const totalRatings = Object.values(updatedRatings).reduce((sum, r) => sum + r, 0);
+      const totalVotes = Object.keys(updatedRatings).length;
+      const averageRating = totalVotes > 0 ? totalRatings / totalVotes : 0;
+      const totalPoints = Object.values(updatedRatings).reduce((sum, r) => sum + starsToPoints(r), 0);
+      
+      await updateDoc(doc(db, RATINGS_COLLECTION, ratingDoc.id), {
+        ratings: updatedRatings,
+        averageRating,
+        totalVotes,
+        totalPoints,
+        lastUpdated: new Date()
+      });
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error saving rating:', error);
+    return false;
+  }
+};
+
+// Get all ratings
+export const getAllRatings = async (): Promise<{ [pokemonId: string]: PokemonRating }> => {
+  try {
+    const ratingsSnapshot = await getDocs(collection(db, RATINGS_COLLECTION));
+    const ratings: { [pokemonId: string]: PokemonRating } = {};
+    
+    ratingsSnapshot.docs.forEach(doc => {
+      const data = doc.data() as any;
+      ratings[data.pokemonId] = {
+        ...data,
+        lastUpdated: data.lastUpdated?.toDate ? data.lastUpdated.toDate() : new Date()
+      };
+    });
+    
+    return ratings;
+  } catch (error) {
+    console.error('Error fetching ratings:', error);
+    return {};
+  }
+};
+
+// Get ratings for a specific Pokemon
+export const getPokemonRating = async (pokemonId: string): Promise<PokemonRating | null> => {
+  try {
+    const ratingsQuery = query(collection(db, RATINGS_COLLECTION), where('pokemonId', '==', pokemonId));
+    const ratingsSnapshot = await getDocs(ratingsQuery);
+    
+    if (ratingsSnapshot.empty) {
+      return null;
+    }
+    
+    const data = ratingsSnapshot.docs[0].data() as any;
+    return {
+      ...data,
+      lastUpdated: data.lastUpdated?.toDate ? data.lastUpdated.toDate() : new Date()
+    };
+  } catch (error) {
+    console.error('Error fetching Pokemon rating:', error);
+    return null;
+  }
+};
+
+// Get global rankings of all Pokemon based on total points
+export const getGlobalRankings = async (): Promise<{ pokemonId: string; rank: number; totalPoints: number }[]> => {
+  try {
+    const ratings = await getAllRatings();
+    const pokemonRatings = Object.values(ratings).map(rating => ({
+      pokemonId: rating.pokemonId,
+      totalPoints: rating.totalPoints || 0
+    }));
+    
+    // Sort by total points (highest first)
+    pokemonRatings.sort((a, b) => b.totalPoints - a.totalPoints);
+    
+    // Assign ranks
+    return pokemonRatings.map((pokemon, index) => ({
+      pokemonId: pokemon.pokemonId,
+      rank: index + 1,
+      totalPoints: pokemon.totalPoints
+    }));
+  } catch (error) {
+    console.error('Error getting global rankings:', error);
+    return [];
+  }
+};
+
+// Get artist-specific rankings (Pokemon ranked within each artist's collection)
+export const getArtistRankings = async (artist: string): Promise<{ pokemonId: string; rank: number; totalPoints: number }[]> => {
+  try {
+    const allPokemon = await getAllPokemon();
+    const artistPokemon = allPokemon.filter(p => p.artist === artist);
+    const ratings = await getAllRatings();
+    
+    const artistPokemonWithRatings = artistPokemon.map(pokemon => ({
+      pokemonId: pokemon.id,
+      totalPoints: ratings[pokemon.id]?.totalPoints || 0
+    }));
+    
+    // Sort by total points (highest first)
+    artistPokemonWithRatings.sort((a, b) => b.totalPoints - a.totalPoints);
+    
+    // Assign ranks
+    return artistPokemonWithRatings.map((pokemon, index) => ({
+      pokemonId: pokemon.pokemonId,
+      rank: index + 1,
+      totalPoints: pokemon.totalPoints
+    }));
+  } catch (error) {
+    console.error('Error getting artist rankings:', error);
     return [];
   }
 };

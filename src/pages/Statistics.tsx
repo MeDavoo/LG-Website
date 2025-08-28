@@ -10,8 +10,8 @@ import {
   ArcElement,
 } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
-import { Users, Image, Palette, TrendingUp, TrendingDown } from 'lucide-react';
-import { getAllPokemon, Pokemon } from '../services/pokemonService';
+import { Users, Image, Palette, TrendingUp, TrendingDown, Trophy } from 'lucide-react';
+import { getAllPokemon, Pokemon, getAllRatings, getArtistRankings } from '../services/pokemonService';
 
 ChartJS.register(
   CategoryScale,
@@ -33,6 +33,9 @@ interface ArtistStats {
 const Statistics = () => {
   const [loading, setLoading] = useState(true);
   const [pokemonData, setPokemonData] = useState<Pokemon[]>([]);
+  const [artistRankings, setArtistRankings] = useState<{ 
+    [artist: string]: { pokemonId: string; rank: number; totalPoints: number; pokemon: Pokemon }[] 
+  }>({});
 
   useEffect(() => {
     loadPokemonData();
@@ -43,6 +46,21 @@ const Statistics = () => {
       setLoading(true);
       const data = await getAllPokemon();
       setPokemonData(data);
+      
+      // Get unique artists and load their rankings
+      const artists = [...new Set(data.map(p => p.artist))];
+      const rankingsMap: { [artist: string]: { pokemonId: string; rank: number; totalPoints: number; pokemon: Pokemon }[] } = {};
+      
+      for (const artist of artists) {
+        const artistRankingData = await getArtistRankings(artist);
+        // Enhance with Pokemon data
+        rankingsMap[artist] = artistRankingData.map(ranking => ({
+          ...ranking,
+          pokemon: data.find(p => p.id === ranking.pokemonId)!
+        }));
+      }
+      
+      setArtistRankings(rankingsMap);
     } catch (error) {
       console.error('Error loading Pokemon data:', error);
     } finally {
@@ -445,6 +463,139 @@ const Statistics = () => {
                             <span className="text-blue-300 text-sm">Perfect balance! 🎯</span>
                           </div>
                         )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Artist Pokemon Rankings */}
+                {artistRankings[stat.artist] && artistRankings[stat.artist].length > 0 && (
+                  <div className="mt-6">
+                    <h5 className="text-white font-semibold mb-3 flex items-center">
+                      <Trophy className="mr-2 text-yellow-400" size={16} />
+                      Pokemon Rankings ({artistRankings[stat.artist].length})
+                    </h5>
+                    
+                    {/* Podium Display for Top 3 */}
+                    {artistRankings[stat.artist].length >= 3 && (
+                      <div className="mb-6 bg-gradient-to-b from-yellow-500/10 to-transparent rounded-lg p-8">
+                        <div className="flex items-end justify-center space-x-8 relative max-w-2xl mx-auto">
+                          {/* 2nd Place - Left */}
+                          <div className="flex flex-col items-center">
+                            <div className="relative mb-3">
+                              <img 
+                                src={artistRankings[stat.artist][1].pokemon.imageUrl} 
+                                alt={artistRankings[stat.artist][1].pokemon.name}
+                                className="w-24 h-24 object-contain filter drop-shadow-lg"
+                              />
+                              <div className="absolute -top-3 -right-3 bg-gray-300 text-black rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
+                                2
+                              </div>
+                            </div>
+                            <div className="bg-gray-300/20 rounded-t-lg w-28 h-14 flex items-center justify-center">
+                              <span className="text-gray-300 font-bold">2nd</span>
+                            </div>
+                          </div>
+                          
+                          {/* 1st Place - Center (Higher) */}
+                          <div className="flex flex-col items-center">
+                            <div className="relative mb-3">
+                              <img 
+                                src={artistRankings[stat.artist][0].pokemon.imageUrl} 
+                                alt={artistRankings[stat.artist][0].pokemon.name}
+                                className="w-32 h-32 object-contain filter drop-shadow-xl transform scale-110"
+                              />
+                              <div className="absolute -top-4 -right-4 bg-yellow-500 text-black rounded-full w-10 h-10 flex items-center justify-center text-lg font-bold">
+                                1
+                              </div>
+                            </div>
+                            <div className="bg-yellow-500/30 rounded-t-lg w-32 h-20 flex items-center justify-center">
+                              <span className="text-yellow-300 font-bold text-lg">1st</span>
+                            </div>
+                          </div>
+                          
+                          {/* 3rd Place - Right */}
+                          <div className="flex flex-col items-center">
+                            <div className="relative mb-3">
+                              <img 
+                                src={artistRankings[stat.artist][2].pokemon.imageUrl} 
+                                alt={artistRankings[stat.artist][2].pokemon.name}
+                                className="w-24 h-24 object-contain filter drop-shadow-lg"
+                              />
+                              <div className="absolute -top-3 -right-3 bg-amber-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
+                                3
+                              </div>
+                            </div>
+                            <div className="bg-amber-600/20 rounded-t-lg w-28 h-12 flex items-center justify-center">
+                              <span className="text-amber-400 font-bold">3rd</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Pokemon Names Below Podium */}
+                        <div className="flex justify-center space-x-8 mt-4 max-w-2xl mx-auto">
+                          <div className="text-center w-28">
+                            <div className="text-gray-300 font-medium truncate">
+                              {artistRankings[stat.artist][1].pokemon.name}
+                            </div>
+                          </div>
+                          <div className="text-center w-32">
+                            <div className="text-yellow-300 font-bold text-lg truncate">
+                              {artistRankings[stat.artist][0].pokemon.name}
+                            </div>
+                          </div>
+                          <div className="text-center w-28">
+                            <div className="text-amber-400 font-medium truncate">
+                              {artistRankings[stat.artist][2].pokemon.name}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="bg-white/5 rounded-lg p-4 max-h-64 overflow-y-auto">
+                      <div className="space-y-2">
+                        {artistRankings[stat.artist].slice(3).map((ranking, index) => (
+                          <div 
+                            key={ranking.pokemonId} 
+                            className="flex items-center justify-between bg-white/5 rounded p-3 hover:bg-white/10 transition-colors"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className={`
+                                flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm
+                                bg-white/20 text-white
+                              `}>
+                                {index + 4}
+                              </div>
+                              <img 
+                                src={ranking.pokemon.imageUrl} 
+                                alt={ranking.pokemon.name}
+                                className="w-8 h-8 object-contain"
+                              />
+                              <div>
+                                <div className="text-white font-medium">
+                                  {ranking.pokemon.name}
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  {ranking.pokemon.types.map(type => (
+                                    <span 
+                                      key={type}
+                                      className="px-2 py-0.5 rounded text-xs font-medium text-white"
+                                      style={{ backgroundColor: getTypeColor(type, 0.8) }}
+                                    >
+                                      {type}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-white/60 text-sm">
+                                Rank #{ranking.rank}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
