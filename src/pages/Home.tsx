@@ -368,24 +368,41 @@ const Home = () => {
       const sourcePosition = draggedPokemon.id;
       const targetPosition = targetPokemon.id;
 
-      console.log(`Swapping Pokemon positions: ${sourcePosition} ↔ ${targetPosition}`);
+      console.log(`Inserting Pokemon from position ${sourcePosition} to position ${targetPosition}`);
 
       // Show smooth feedback
-      setSwapFeedback(`#${sourcePosition} ↔ #${targetPosition}`);
-      setShowSwapFeedback(true);
+      setPositionFeedback(`#${sourcePosition} → #${targetPosition}`);
+      setShowPositionFeedback(true);
 
-      // Update positions in Firebase for both Pokemon (if they exist)
+      // Get all Pokemon that need to be updated
+      const pokemonToUpdate = pokemonSlots.filter(p => p.hasArt && p.firebaseId);
       const updatePromises = [];
 
+      // Determine which Pokemon need to move
+      if (sourcePosition < targetPosition) {
+        // Moving down: shift Pokemon between source+1 and target up by 1
+        for (const pokemon of pokemonToUpdate) {
+          if (pokemon.id > sourcePosition && pokemon.id <= targetPosition) {
+            updatePromises.push(
+              updatePokemon(pokemon.firebaseId!, { pokedexNumber: pokemon.id - 1 })
+            );
+          }
+        }
+      } else {
+        // Moving up: shift Pokemon between target and source-1 down by 1
+        for (const pokemon of pokemonToUpdate) {
+          if (pokemon.id >= targetPosition && pokemon.id < sourcePosition) {
+            updatePromises.push(
+              updatePokemon(pokemon.firebaseId!, { pokedexNumber: pokemon.id + 1 })
+            );
+          }
+        }
+      }
+
+      // Move the dragged Pokemon to the target position
       if (draggedPokemon.firebaseId && draggedPokemon.hasArt) {
         updatePromises.push(
           updatePokemon(draggedPokemon.firebaseId, { pokedexNumber: targetPosition })
-        );
-      }
-
-      if (targetPokemon.firebaseId && targetPokemon.hasArt) {
-        updatePromises.push(
-          updatePokemon(targetPokemon.firebaseId, { pokedexNumber: sourcePosition })
         );
       }
 
@@ -396,14 +413,14 @@ const Home = () => {
       
       // Hide feedback after a moment
       setTimeout(() => {
-        setShowSwapFeedback(false);
+        setShowPositionFeedback(false);
       }, 2000);
     } catch (error) {
-      console.error('Error swapping Pokemon positions:', error);
-      setSwapFeedback('❌ Swap failed');
-      setShowSwapFeedback(true);
+      console.error('Error inserting Pokemon position:', error);
+      setPositionFeedback('❌ Insert failed');
+      setShowPositionFeedback(true);
       setTimeout(() => {
-        setShowSwapFeedback(false);
+        setShowPositionFeedback(false);
       }, 3000);
     } finally {
       setDraggedPokemon(null);
@@ -472,8 +489,8 @@ const Home = () => {
   const [isPositionEditorMode, setIsPositionEditorMode] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedPokemon, setDraggedPokemon] = useState<PokemonSlot | null>(null);
-  const [swapFeedback, setSwapFeedback] = useState<string>('');
-  const [showSwapFeedback, setShowSwapFeedback] = useState(false);
+  const [positionFeedback, setPositionFeedback] = useState<string>('');
+  const [showPositionFeedback, setShowPositionFeedback] = useState(false);
   
   // Notification system
   const [notification, setNotification] = useState<{
@@ -1097,10 +1114,10 @@ const Home = () => {
                 )}
               </div>
 
-              {/* Swap Feedback Notification */}
-              {showSwapFeedback && (
+              {/* Position Insert Feedback Notification */}
+              {showPositionFeedback && (
                 <div className="fixed top-4 left-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-pulse">
-                  {swapFeedback}
+                  {positionFeedback}
                 </div>
               )}
 
