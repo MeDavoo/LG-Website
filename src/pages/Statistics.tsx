@@ -13,7 +13,7 @@ import {
 import { useEffect, useState } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Users, Image, Palette, TrendingUp, TrendingDown, Trophy } from 'lucide-react';
-import { getAllPokemon, Pokemon, getArtistRankings } from '../services/pokemonService';
+import { getAllPokemon, Pokemon, getArtistRankings, getAllRatings, PokemonRating } from '../services/pokemonService';
 
 ChartJS.register(
   CategoryScale,
@@ -40,6 +40,7 @@ const Statistics = () => {
   const [artistRankings, setArtistRankings] = useState<{ 
     [artist: string]: { pokemonId: string; rank: number; totalPoints: number; pokemon: Pokemon }[] 
   }>({});
+  const [pokemonRatings, setPokemonRatings] = useState<{ [pokemonId: string]: PokemonRating }>({});
   const [selectedArtist, setSelectedArtist] = useState<string>(''); // New state for selected artist tab
 
   useEffect(() => {
@@ -51,6 +52,10 @@ const Statistics = () => {
       setLoading(true);
       const data = await getAllPokemon();
       setPokemonData(data);
+      
+      // Load all Pokemon ratings
+      const ratings = await getAllRatings();
+      setPokemonRatings(ratings);
       
       // Get unique artists and load their rankings
       const artists = [...new Set(data.map(p => p.artist))];
@@ -143,6 +148,21 @@ const Statistics = () => {
       setSelectedArtist(artistStats[0].artist);
     }
   }, [artistStats, selectedArtist]);
+
+  // Helper function to get average stars for a Pokemon
+  const getAverageStars = (pokemonId: string): number | null => {
+    const rating = pokemonRatings[pokemonId];
+    return rating ? rating.averageRating : null;
+  };
+
+  // Helper function to format average stars display
+  const formatAverageStars = (pokemonId: string): string => {
+    const avgStars = getAverageStars(pokemonId);
+    if (avgStars === null || avgStars === 0) {
+      return 'No ratings';
+    }
+    return `${avgStars.toFixed(1)}★`;
+  };
 
   // Get suggestions for an artist based on their type distribution
   const getArtistSuggestions = (typeDistribution: { [key: string]: number }) => {
@@ -633,15 +653,24 @@ const Statistics = () => {
                               <div className="text-gray-300 font-medium truncate">
                                 {artistRankings[stat.artist][1].pokemon.name}
                               </div>
+                              <div className="text-yellow-400 text-xs mt-1">
+                                {formatAverageStars(artistRankings[stat.artist][1].pokemonId)}
+                              </div>
                             </div>
                             <div className="text-center w-32">
                               <div className="text-yellow-300 font-bold text-lg truncate">
                                 {artistRankings[stat.artist][0].pokemon.name}
-              </div>
+                              </div>
+                              <div className="text-yellow-400 text-sm mt-1">
+                                {formatAverageStars(artistRankings[stat.artist][0].pokemonId)}
+                              </div>
                             </div>
                             <div className="text-center w-28">
                               <div className="text-amber-400 font-medium truncate">
                                 {artistRankings[stat.artist][2].pokemon.name}
+                              </div>
+                              <div className="text-yellow-400 text-xs mt-1">
+                                {formatAverageStars(artistRankings[stat.artist][2].pokemonId)}
                               </div>
                             </div>
                           </div>
@@ -687,6 +716,9 @@ const Statistics = () => {
                               <div className="text-right">
                                 <div className="text-white/60 text-sm">
                                   Rank #{ranking.rank}
+                                </div>
+                                <div className="text-yellow-400 text-xs mt-1">
+                                  {formatAverageStars(ranking.pokemonId)}
                                 </div>
                               </div>
                             </div>
@@ -756,7 +788,13 @@ const Statistics = () => {
                                         },
                                         label: (context: any) => {
                                           const rank = context.parsed.y;
-                                          return [`Artist Rank: #${rank}`, `Global Rank: #${sortedByTime[context.dataIndex].rank}`];
+                                          const pokemon = sortedByTime[context.dataIndex];
+                                          const avgStars = formatAverageStars(pokemon.pokemonId);
+                                          return [
+                                            `Artist Rank: #${rank}`, 
+                                            `Global Rank: #${pokemon.rank}`,
+                                            `Average Rating: ${avgStars}`
+                                          ];
                                         },
                                         afterLabel: (context: any) => {
                                           const pokemon = sortedByTime[context.dataIndex].pokemon;
