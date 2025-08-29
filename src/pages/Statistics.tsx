@@ -10,7 +10,7 @@ import {
   LineElement,
   PointElement
 } from 'chart.js';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Users, Image, Palette, TrendingUp, TrendingDown, Trophy } from 'lucide-react';
 import { getAllPokemon, Pokemon, getArtistRankings } from '../services/pokemonService';
