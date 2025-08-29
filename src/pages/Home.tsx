@@ -726,6 +726,7 @@ const Home = () => {
   const [selectedArtists, setSelectedArtists] = useState<string[]>([]);
   const [uniqueOnly, setUniqueOnly] = useState(false);
   const [evolutionFilter, setEvolutionFilter] = useState<'all' | 'stage0' | 'stage1' | 'stage2' | 'gmax' | 'legendary' | 'mega' | 'evolved'>('all'); // Evolution filtering including new types
+  const [userRatingFilter, setUserRatingFilter] = useState<number | null>(null); // Filter by user's own ratings
 
   // User rating statistics
   const [userRatingStats, setUserRatingStats] = useState<{
@@ -745,7 +746,7 @@ const Home = () => {
   const allTypes = Array.from(new Set(pokemonSlots.filter(p => p.hasArt && p.types).flatMap(p => p.types!)));
 
   // Check if any filters are active
-  const hasActiveFilters = searchTerm || selectedTypes.length > 0 || selectedArtists.length > 0 || uniqueOnly || evolutionFilter !== 'all';
+  const hasActiveFilters = searchTerm || selectedTypes.length > 0 || selectedArtists.length > 0 || uniqueOnly || evolutionFilter !== 'all' || userRatingFilter !== null;
 
   // Filter pokemon based on current filters
   const filteredPokemon = pokemonSlots.filter(pokemon => {
@@ -814,6 +815,15 @@ const Home = () => {
       }
     } else if (evolutionFilter !== 'all' && pokemon.evolutionStage === undefined) {
       return false; // Hide Pokemon without evolution stage data when filtering
+    }
+    
+    // User rating filter - show only Pokemon that the user voted with a specific star rating
+    if (userRatingFilter !== null && pokemon.firebaseId) {
+      const deviceId = getDeviceId();
+      const userRating = pokemonRatings[pokemon.firebaseId]?.ratings[deviceId];
+      if (userRating !== userRatingFilter) {
+        return false;
+      }
     }
     
     return true;
@@ -1097,6 +1107,7 @@ const Home = () => {
                       setSelectedArtists([]);
                       setUniqueOnly(false);
                       setEvolutionFilter('all');
+                      setUserRatingFilter(null);
                       setSelectedPokemon(null);
                     }}
                     className="w-full px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm"
@@ -1135,9 +1146,28 @@ const Home = () => {
                           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                         </svg>
                       </div>
-                      <div className="text-white/70 font-semibold">
+                      <button
+                        onClick={() => {
+                          if (userRatingFilter === star) {
+                            // If already filtering by this star, clear the filter
+                            setUserRatingFilter(null);
+                          } else {
+                            // Set filter to this star rating
+                            setUserRatingFilter(star);
+                          }
+                        }}
+                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                          userRatingFilter === star
+                            ? 'bg-blue-500 text-white'
+                            : userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10] > 0
+                            ? 'bg-white/20 text-white/90 hover:bg-white/30'
+                            : 'bg-white/10 text-white/50 cursor-default'
+                        }`}
+                        disabled={userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10] === 0}
+                        title={userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10] > 0 ? `Filter Pokemon you rated ${star} stars` : `No Pokemon rated ${star} stars`}
+                      >
                         {userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10]}
-                      </div>
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1168,6 +1198,11 @@ const Home = () => {
                       {hasActiveFilters && (
                         <span className="ml-2 text-blue-300">
                           ({filteredPokemon.length} filtered)
+                        </span>
+                      )}
+                      {userRatingFilter !== null && (
+                        <span className="ml-2 text-purple-300 text-xs">
+                          [You rated {userRatingFilter}★]
                         </span>
                       )}
                     </div>
