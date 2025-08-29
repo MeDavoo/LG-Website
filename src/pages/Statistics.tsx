@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -8,8 +7,11 @@ import {
   Tooltip,
   Legend,
   ArcElement,
+  LineElement,
+  PointElement
 } from 'chart.js';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import React, { useEffect, useState } from 'react';
+import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Users, Image, Palette, TrendingUp, TrendingDown, Trophy } from 'lucide-react';
 import { getAllPokemon, Pokemon, getArtistRankings } from '../services/pokemonService';
 
@@ -20,7 +22,9 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  ArcElement
+  ArcElement,
+  LineElement,
+  PointElement
 );
 
 interface ArtistStats {
@@ -90,6 +94,13 @@ const Statistics = () => {
 
   // Count unique Pokemon (U0, U1, U2)
   const uniquePokemonCount = pokemonData.filter(p => p.unique && ['U0', 'U1', 'U2'].includes(p.unique)).length;
+
+  // Evolution distribution
+  const evolutionCount = {
+    'No Evolution (U0)': pokemonData.filter(p => p.unique === 'U0').length,
+    'One Evolution (U1)': pokemonData.filter(p => p.unique === 'U1').length,
+    'Two Evolutions (U2)': pokemonData.filter(p => p.unique === 'U2').length,
+  };
 
   // All possible Pokemon types
   const allPokemonTypes = [
@@ -207,8 +218,31 @@ const Statistics = () => {
     ],
   };
 
+  // Evolution distribution chart
+  const evolutionChartData = {
+    labels: Object.keys(evolutionCount),
+    datasets: [
+      {
+        label: 'Pokemon Count',
+        data: Object.values(evolutionCount),
+        backgroundColor: [
+          'rgba(239, 68, 68, 0.8)',   // Red for U0 (no evolution)
+          'rgba(245, 158, 11, 0.8)',  // Orange for U1 (one evolution)
+          'rgba(34, 197, 94, 0.8)',   // Green for U2 (two evolutions)
+        ],
+        borderColor: [
+          'rgba(239, 68, 68, 1)',
+          'rgba(245, 158, 11, 1)',
+          'rgba(34, 197, 94, 1)',
+        ],
+        borderWidth: 2,
+      },
+    ],
+  };
+
   const chartOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
         labels: {
@@ -218,8 +252,10 @@ const Statistics = () => {
     },
     scales: {
       y: {
+        beginAtZero: true,
         ticks: {
           color: 'white',
+          stepSize: 1,
         },
         grid: {
           color: 'rgba(255, 255, 255, 0.2)',
@@ -228,21 +264,38 @@ const Statistics = () => {
       x: {
         ticks: {
           color: 'white',
+          maxRotation: 45,
+          minRotation: 0,
+          font: {
+            size: 11,
+          },
         },
         grid: {
           color: 'rgba(255, 255, 255, 0.2)',
         },
       },
     },
+    layout: {
+      padding: {
+        top: 10,
+        bottom: 10,
+        left: 10,
+        right: 10,
+      },
+    },
   };
 
   const doughnutOptions = {
     responsive: true,
-    maintainAspectRatio: false,
+    maintainAspectRatio: true,
+    aspectRatio: 1,
     plugins: {
       legend: {
         display: false, // We'll create custom legend
       },
+    },
+    layout: {
+      padding: 10,
     },
   };
 
@@ -297,9 +350,9 @@ const Statistics = () => {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Type Distribution */}
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-8">
+        {/* Type Distribution - Takes 1/2 width (2 columns) */}
+        <div className="lg:col-span-2 bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
           <h3 className="text-xl font-bold text-white mb-6">Pokemon Types Distribution</h3>
           <div className="flex items-center gap-6 h-80">
             {/* Compact Legend on the Left */}
@@ -320,18 +373,28 @@ const Statistics = () => {
               </div>
             </div>
             
-            {/* Larger Chart on the Right */}
-            <div className="flex-1 h-full">
-              <Doughnut data={typeChartData} options={doughnutOptions} />
+            {/* Doughnut Chart - Properly contained */}
+            <div className="flex-1 h-full flex items-center justify-center overflow-hidden">
+              <div className="w-72 h-72 max-w-full max-h-full">
+                <Doughnut data={typeChartData} options={doughnutOptions} />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Artist Contributions */}
+        {/* Artist Contributions - Takes 1/4 width (1 column) */}
         <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
-          <h3 className="text-xl font-bold text-white mb-6">Artist Contributions</h3>
+          <h3 className="text-lg font-bold text-white mb-6">Artist Contributions</h3>
           <div className="h-80">
             <Bar data={artistChartData} options={chartOptions} />
+          </div>
+        </div>
+
+        {/* Evolution Distribution - Takes 1/4 width (1 column) */}
+        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
+          <h3 className="text-lg font-bold text-white mb-6">Evolution Distribution</h3>
+          <div className="h-80">
+            <Bar data={evolutionChartData} options={chartOptions} />
           </div>
         </div>
       </div>
@@ -628,6 +691,109 @@ const Statistics = () => {
                               </div>
                             </div>
                           ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Artist Performance Over Time Line Chart */}
+                  {artistRankings[stat.artist] && artistRankings[stat.artist].length > 1 && (
+                    <div className="mt-6">
+                      <h5 className="text-white font-semibold mb-3 flex items-center">
+                        <TrendingUp className="mr-2 text-blue-400" size={16} />
+                        Performance Over Time ({artistRankings[stat.artist].length} Pokemon)
+                      </h5>
+                      <div className="bg-white/5 rounded-lg p-4">
+                        <div className="h-80">
+                          <Line 
+                            data={{
+                              labels: artistRankings[stat.artist].map(ranking => ranking.pokemon.name),
+                              datasets: [
+                                {
+                                  label: 'Artist Rank',
+                                  data: artistRankings[stat.artist].map((_, index) => index + 1),
+                                  borderColor: 'rgba(59, 130, 246, 1)',
+                                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                  borderWidth: 3,
+                                  fill: true,
+                                  tension: 0.4,
+                                  pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                                  pointBorderColor: '#ffffff',
+                                  pointBorderWidth: 2,
+                                  pointRadius: 6,
+                                  pointHoverRadius: 8,
+                                },
+                              ],
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              plugins: {
+                                legend: {
+                                  display: false,
+                                },
+                                tooltip: {
+                                  callbacks: {
+                                    title: (context: any) => {
+                                      const index = context[0].dataIndex;
+                                      const pokemon = artistRankings[stat.artist][index].pokemon;
+                                      return `${pokemon.name} (#${parseInt(pokemon.id)})`;
+                                    },
+                                    label: (context: any) => {
+                                      const index = context[0].dataIndex;
+                                      const globalRank = artistRankings[stat.artist][index].rank;
+                                      return [`Artist Rank: #${context.parsed.y}`, `Global Rank: #${globalRank}`];
+                                    },
+                                  },
+                                },
+                              },
+                              scales: {
+                                y: {
+                                  reverse: true, // Lower ranks (better) appear higher on chart
+                                  beginAtZero: false,
+                                  title: {
+                                    display: true,
+                                    text: 'Pokemon Rank',
+                                    color: 'white',
+                                    font: {
+                                      size: 12,
+                                    },
+                                  },
+                                  ticks: {
+                                    color: 'white',
+                                    stepSize: 1,
+                                    callback: function(value) {
+                                      return '#' + value;
+                                    },
+                                  },
+                                  grid: {
+                                    color: 'rgba(255, 255, 255, 0.2)',
+                                  },
+                                },
+                                x: {
+                                  title: {
+                                    display: true,
+                                    text: 'Pokemon Names',
+                                    color: 'white',
+                                    font: {
+                                      size: 12,
+                                    },
+                                  },
+                                  ticks: {
+                                    color: 'white',
+                                    font: {
+                                      size: 9,
+                                    },
+                                    maxRotation: 45,
+                                    minRotation: 45,
+                                  },
+                                  grid: {
+                                    color: 'rgba(255, 255, 255, 0.2)',
+                                  },
+                                },
+                              },
+                            }}
+                          />
                         </div>
                       </div>
                     </div>
