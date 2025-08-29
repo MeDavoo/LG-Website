@@ -1,4 +1,4 @@
-# LGDEX - Pokemon Art Gallery
+# LG POKEDEX - Personal website for custom Pokemon Art, Ranking and Stats tracking 
 
 A nice website to showcase custom Pokemon artwork with statistics tracking.
 
