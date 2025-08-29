@@ -705,95 +705,115 @@ const Statistics = () => {
                       </h5>
                       <div className="bg-white/5 rounded-lg p-4">
                         <div className="h-80">
-                          <Line 
-                            data={{
-                              labels: artistRankings[stat.artist].map(ranking => ranking.pokemon.name),
-                              datasets: [
-                                {
-                                  label: 'Artist Rank',
-                                  data: artistRankings[stat.artist].map((_, index) => index + 1),
-                                  borderColor: 'rgba(59, 130, 246, 1)',
-                                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                  borderWidth: 3,
-                                  fill: true,
-                                  tension: 0.4,
-                                  pointBackgroundColor: 'rgba(59, 130, 246, 1)',
-                                  pointBorderColor: '#ffffff',
-                                  pointBorderWidth: 2,
-                                  pointRadius: 6,
-                                  pointHoverRadius: 8,
-                                },
-                              ],
-                            }}
-                            options={{
-                              responsive: true,
-                              maintainAspectRatio: false,
-                              plugins: {
-                                legend: {
-                                  display: false,
-                                },
-                                tooltip: {
-                                  callbacks: {
-                                    title: (context: any) => {
-                                      const index = context[0].dataIndex;
-                                      const pokemon = artistRankings[stat.artist][index].pokemon;
-                                      return `${pokemon.name} (#${parseInt(pokemon.id)})`;
+                          {(() => {
+                            // Sort Pokemon by their ID/pokedexNumber to show chronological order
+                            const sortedByTime = [...artistRankings[stat.artist]].sort((a, b) => {
+                              const aNumber = parseInt(a.pokemon.id) || a.pokemon.pokedexNumber || 0;
+                              const bNumber = parseInt(b.pokemon.id) || b.pokemon.pokedexNumber || 0;
+                              return aNumber - bNumber;
+                            });
+                            
+                            // Find the rank of each Pokemon within this artist's collection
+                            const artistRanksMap = new Map();
+                            artistRankings[stat.artist].forEach((ranking, index) => {
+                              artistRanksMap.set(ranking.pokemonId, index + 1);
+                            });
+                            
+                            return (
+                              <Line 
+                                data={{
+                                  labels: sortedByTime.map(ranking => ranking.pokemon.name),
+                                  datasets: [
+                                    {
+                                      label: 'Artist Rank',
+                                      data: sortedByTime.map(ranking => artistRanksMap.get(ranking.pokemonId)),
+                                      borderColor: 'rgba(59, 130, 246, 1)',
+                                      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                      borderWidth: 3,
+                                      fill: true,
+                                      tension: 0.4,
+                                      pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                                      pointBorderColor: '#ffffff',
+                                      pointBorderWidth: 2,
+                                      pointRadius: 6,
+                                      pointHoverRadius: 8,
                                     },
-                                    label: (context: any) => {
-                                      const index = context[0].dataIndex;
-                                      const globalRank = artistRankings[stat.artist][index].rank;
-                                      return [`Artist Rank: #${context.parsed.y}`, `Global Rank: #${globalRank}`];
+                                  ],
+                                }}
+                                options={{
+                                  responsive: true,
+                                  maintainAspectRatio: false,
+                                  plugins: {
+                                    legend: {
+                                      display: false,
                                     },
-                                  },
-                                },
-                              },
-                              scales: {
-                                y: {
-                                  reverse: true, // Lower ranks (better) appear higher on chart
-                                  beginAtZero: false,
-                                  title: {
-                                    display: true,
-                                    text: 'Pokemon Rank',
-                                    color: 'white',
-                                    font: {
-                                      size: 12,
-                                    },
-                                  },
-                                  ticks: {
-                                    color: 'white',
-                                    stepSize: 1,
-                                    callback: function(value) {
-                                      return '#' + value;
-                                    },
-                                  },
-                                  grid: {
-                                    color: 'rgba(255, 255, 255, 0.2)',
-                                  },
-                                },
-                                x: {
-                                  title: {
-                                    display: true,
-                                    text: 'Pokemon Names',
-                                    color: 'white',
-                                    font: {
-                                      size: 12,
+                                    tooltip: {
+                                      callbacks: {
+                                        title: (context: any) => {
+                                          const index = context[0].dataIndex;
+                                          const pokemon = sortedByTime[index].pokemon;
+                                          return `${pokemon.name} (#${parseInt(pokemon.id) || pokemon.pokedexNumber || '?'})`;
+                                        },
+                                        label: (context: any) => {
+                                          const rank = context.parsed.y;
+                                          return [`Artist Rank: #${rank}`, `Global Rank: #${sortedByTime[context.dataIndex].rank}`];
+                                        },
+                                        afterLabel: (context: any) => {
+                                          const pokemon = sortedByTime[context.dataIndex].pokemon;
+                                          return `Pokemon ID: ${pokemon.id}`;
+                                        },
+                                      },
                                     },
                                   },
-                                  ticks: {
-                                    color: 'white',
-                                    font: {
-                                      size: 9,
+                                  scales: {
+                                    y: {
+                                      reverse: true, // Lower ranks (better) appear higher on chart
+                                      beginAtZero: false,
+                                      title: {
+                                        display: true,
+                                        text: 'Pokemon Rank',
+                                        color: 'white',
+                                        font: {
+                                          size: 12,
+                                        },
+                                      },
+                                      ticks: {
+                                        color: 'white',
+                                        stepSize: 1,
+                                        callback: function(value) {
+                                          return '#' + value;
+                                        },
+                                      },
+                                      grid: {
+                                        color: 'rgba(255, 255, 255, 0.2)',
+                                      },
                                     },
-                                    maxRotation: 45,
-                                    minRotation: 45,
+                                    x: {
+                                      title: {
+                                        display: true,
+                                        text: 'Pokemon Names (Chronological Order)',
+                                        color: 'white',
+                                        font: {
+                                          size: 12,
+                                        },
+                                      },
+                                      ticks: {
+                                        color: 'white',
+                                        font: {
+                                          size: 9,
+                                        },
+                                        maxRotation: 45,
+                                        minRotation: 45,
+                                      },
+                                      grid: {
+                                        color: 'rgba(255, 255, 255, 0.2)',
+                                      },
+                                    },
                                   },
-                                  grid: {
-                                    color: 'rgba(255, 255, 255, 0.2)',
-                                  },
-                                },
-                              },
-                            }}
-                          />
+                                }}
+                              />
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
