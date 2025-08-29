@@ -107,14 +107,14 @@ const Home = () => {
       
       // Find all ratings made by this device
       const userRatings: number[] = [];
-      const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 };
       
       Object.values(allRatings).forEach(pokemonRating => {
         const userRating = pokemonRating.ratings[deviceId];
         if (userRating) {
           userRatings.push(userRating);
-          if (userRating >= 1 && userRating <= 5) {
-            ratingDistribution[userRating as 1 | 2 | 3 | 4 | 5]++;
+          if (userRating >= 1 && userRating <= 10) {
+            ratingDistribution[userRating as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10]++;
           }
         }
       });
@@ -735,7 +735,7 @@ const Home = () => {
   }>({
     averageRating: 0,
     totalRatings: 0,
-    ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+    ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
   });
 
   // Get unique artists from the data
@@ -933,85 +933,90 @@ const Home = () => {
                 </div>
               </div>
               
-              {/* Artists */}
+              {/* Artists & Uniques - Combined */}
               <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2 animate-filter-item" style={{animationDelay: '0.5s'}}>
-                <h3 className="text-white font-semibold mb-1">Artists</h3>
-                <div className="grid grid-cols-2 gap-1">
-                  {['DAVE', 'JOAO', 'GUTO'].map(artist => (
-                    <button
-                      key={artist}
-                      onClick={() => {
-                        if (selectedArtists.includes(artist)) {
-                          setSelectedArtists(selectedArtists.filter(a => a !== artist));
-                        } else {
-                          setSelectedArtists([...selectedArtists, artist]);
-                        }
-                      }}
-                      className={`px-2 py-2 rounded text-xs font-semibold transition-all ${
-                        selectedArtists.includes(artist)
-                          ? 'bg-yellow-400 text-black'
-                          : 'bg-white/20 text-white/80 hover:bg-white/30'
-                      }`}
-                    >
-                      {artist}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Special */}
-              <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2 animate-filter-item" style={{animationDelay: '0.6s'}}>
-                <h3 className="text-white font-semibold mb-1">Uniques</h3>
-                <div className="space-y-1">
-                  <button
-                    onClick={() => {
-                      setUniqueOnly(false);
-                      if (selectedTypes.includes('U0')) {
-                        setSelectedTypes(selectedTypes.filter(t => t !== 'U0'));
-                      } else {
-                        setSelectedTypes([...selectedTypes.filter(t => !['U0', 'U1', 'U2'].includes(t)), 'U0']);
-                      }
-                    }}
-                    className={`w-full px-2 py-1 rounded text-sm font-semibold transition-all ${
-                      selectedTypes.includes('U0')
-                        ? 'bg-gray-500 text-white'
-                        : 'bg-white/20 text-white/80 hover:bg-white/30'
-                    }`}
-                  >
-                    Doesn't Evolve
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (selectedTypes.includes('U1')) {
-                        setSelectedTypes(selectedTypes.filter(t => t !== 'U1'));
-                      } else {
-                        setSelectedTypes([...selectedTypes.filter(t => !['U0', 'U1', 'U2'].includes(t)), 'U1']);
-                      }
-                    }}
-                    className={`w-full px-2 py-1 rounded text-sm font-semibold transition-all ${
-                      selectedTypes.includes('U1')
-                        ? 'bg-gray-500 text-white'
-                        : 'bg-white/20 text-white/80 hover:bg-white/30'
-                    }`}
-                  >
-                    Evolves Once
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (selectedTypes.includes('U2')) {
-                        setSelectedTypes(selectedTypes.filter(t => t !== 'U2'));
-                      } else {
-                        setSelectedTypes([...selectedTypes.filter(t => !['U0', 'U1', 'U2'].includes(t)), 'U2']);
-                      }
-                    }}
-                    className={`w-full px-2 py-1 rounded text-sm font-semibold transition-all ${
-                      selectedTypes.includes('U2')
-                        ? 'bg-gray-500 text-white'
-                        : 'bg-white/20 text-white/80 hover:bg-white/30'
-                    }`}
-                  >
-                    Evolves Twice
-                  </button>
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Artists Section */}
+                  <div>
+                    <h3 className="text-white font-semibold mb-1 text-sm">Artists</h3>
+                    <div className="space-y-1">
+                      {['DAVE', 'JOAO', 'GUTO'].map(artist => (
+                        <button
+                          key={artist}
+                          onClick={() => {
+                            if (selectedArtists.includes(artist)) {
+                              setSelectedArtists(selectedArtists.filter(a => a !== artist));
+                            } else {
+                              setSelectedArtists([...selectedArtists, artist]);
+                            }
+                          }}
+                          className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
+                            selectedArtists.includes(artist)
+                              ? 'bg-yellow-400 text-black'
+                              : 'bg-white/20 text-white/80 hover:bg-white/30'
+                          }`}
+                        >
+                          {artist}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Uniques Section */}
+                  <div>
+                    <h3 className="text-white font-semibold mb-1 text-sm">Uniques</h3>
+                    <div className="space-y-1">
+                      <button
+                        onClick={() => {
+                          setUniqueOnly(false);
+                          if (selectedTypes.includes('U0')) {
+                            setSelectedTypes(selectedTypes.filter(t => t !== 'U0'));
+                          } else {
+                            setSelectedTypes([...selectedTypes.filter(t => !['U0', 'U1', 'U2'].includes(t)), 'U0']);
+                          }
+                        }}
+                        className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
+                          selectedTypes.includes('U0')
+                            ? 'bg-gray-500 text-white'
+                            : 'bg-white/20 text-white/80 hover:bg-white/30'
+                        }`}
+                      >
+                        Doesn't Evolve
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (selectedTypes.includes('U1')) {
+                            setSelectedTypes(selectedTypes.filter(t => t !== 'U1'));
+                          } else {
+                            setSelectedTypes([...selectedTypes.filter(t => !['U0', 'U1', 'U2'].includes(t)), 'U1']);
+                          }
+                        }}
+                        className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
+                          selectedTypes.includes('U1')
+                            ? 'bg-gray-500 text-white'
+                            : 'bg-white/20 text-white/80 hover:bg-white/30'
+                        }`}
+                      >
+                        Evolves Once
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (selectedTypes.includes('U2')) {
+                            setSelectedTypes(selectedTypes.filter(t => t !== 'U2'));
+                          } else {
+                            setSelectedTypes([...selectedTypes.filter(t => !['U0', 'U1', 'U2'].includes(t)), 'U2']);
+                          }
+                        }}
+                        className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
+                          selectedTypes.includes('U2')
+                            ? 'bg-gray-500 text-white'
+                            : 'bg-white/20 text-white/80 hover:bg-white/30'
+                        }`}
+                      >
+                        Evolves Twice
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -1118,10 +1123,10 @@ const Home = () => {
                 
                 {/* Rating Distribution */}
                 <div className="space-y-1">
-                  {[5, 4, 3, 2, 1].map(star => (
+                  {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(star => (
                     <div key={star} className="flex items-center justify-between text-xs">
                       <div className="flex items-center">
-                        <span className="text-yellow-300 w-2 text-center font-bold">{star}</span>
+                        <span className="text-yellow-300 w-4 text-center font-bold">{star}</span>
                         <svg
                           className="w-3 h-3 text-yellow-300 ml-1"
                           fill="currentColor"
@@ -1131,7 +1136,7 @@ const Home = () => {
                         </svg>
                       </div>
                       <div className="text-white/70 font-semibold">
-                        {userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5]}
+                        {userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10]}
                       </div>
                     </div>
                   ))}
