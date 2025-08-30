@@ -1557,8 +1557,186 @@ const Home = () => {
                       </div>
                     </div>
                     
-                    {/* Special Status and Evolution Stage - Horizontal Layout */}
-                    <div className="grid"></div>
+                    {/* Evolution Navigation */}
+                    {selectedPokemon && selectedPokemon.hasArt && selectedPokemon.evolutionStage !== undefined && (() => {
+                      const currentId = selectedPokemon.id;
+                      const currentStage = selectedPokemon.evolutionStage;
+                      const evolutionButtons: PokemonSlot[] = [];
+                      
+                      // Helper function to get Pokemon by ID
+                      const getPokemonById = (id: number) => 
+                        pokemonSlots.find(p => p.id === id && p.hasArt && p.evolutionStage !== undefined);
+                      
+                      // Handle MEGA/GMAX forms (stages 3, 5) - check backwards
+                      if (currentStage === 5 || currentStage === 3) {
+                        // Check behind for stage 2
+                        const stage2Pokemon = getPokemonById(currentId - 1);
+                        if (stage2Pokemon && stage2Pokemon.evolutionStage === 2) {
+                          evolutionButtons.push(stage2Pokemon);
+                          
+                          // Check behind stage 2 for stage 1
+                          const stage1Pokemon = getPokemonById(currentId - 2);
+                          if (stage1Pokemon && stage1Pokemon.evolutionStage === 1) {
+                            evolutionButtons.unshift(stage1Pokemon); // Add to beginning
+                            
+                            // Check behind stage 1 for stage 0
+                            const stage0Pokemon = getPokemonById(currentId - 3);
+                            if (stage0Pokemon && stage0Pokemon.evolutionStage === 0) {
+                              evolutionButtons.unshift(stage0Pokemon); // Add to beginning
+                            }
+                          }
+                        }
+                        // If no stage 2, check directly for stage 1
+                        else {
+                          const stage1Pokemon = getPokemonById(currentId - 1);
+                          if (stage1Pokemon && stage1Pokemon.evolutionStage === 1) {
+                            evolutionButtons.push(stage1Pokemon);
+                            
+                            // Check behind stage 1 for stage 0
+                            const stage0Pokemon = getPokemonById(currentId - 2);
+                            if (stage0Pokemon && stage0Pokemon.evolutionStage === 0) {
+                              evolutionButtons.unshift(stage0Pokemon); // Add to beginning
+                            }
+                          }
+                          // If no stage 1, check directly for stage 0
+                          else {
+                            const stage0Pokemon = getPokemonById(currentId - 1);
+                            if (stage0Pokemon && stage0Pokemon.evolutionStage === 0) {
+                              evolutionButtons.push(stage0Pokemon);
+                            }
+                          }
+                        }
+                      }
+                      // Handle normal evolution stages (0, 1, 2)
+                      else {
+                        // Check backwards (pre-evolutions)
+                        const prevPokemon = getPokemonById(currentId - 1);
+                        if (prevPokemon && prevPokemon.evolutionStage === currentStage - 1) {
+                          evolutionButtons.push(prevPokemon);
+                          
+                          // Check if there's another stage before that
+                          const prevPrevPokemon = getPokemonById(currentId - 2);
+                          if (prevPrevPokemon && prevPrevPokemon.evolutionStage === currentStage - 2) {
+                            evolutionButtons.unshift(prevPrevPokemon); // Add to beginning
+                          }
+                        }
+                        
+                        // Check forwards (evolutions)
+                        const nextPokemon = getPokemonById(currentId + 1);
+                        if (nextPokemon) {
+                          // Check for normal evolution (stage + 1)
+                          if (nextPokemon.evolutionStage === currentStage + 1) {
+                            evolutionButtons.push(nextPokemon);
+                            
+                            // Check if there's another stage after that
+                            const nextNextPokemon = getPokemonById(currentId + 2);
+                            if (nextNextPokemon && nextNextPokemon.evolutionStage === currentStage + 2) {
+                              evolutionButtons.push(nextNextPokemon);
+                            }
+                          }
+                          // Check for special forms (MEGA, GMAX) immediately after
+                          else if (nextPokemon.evolutionStage === 5 || nextPokemon.evolutionStage === 3) {
+                            evolutionButtons.push(nextPokemon);
+                          }
+                        }
+                        
+                        // Check position +2 for MEGA/GMAX if +1 is normal evolution
+                        if (nextPokemon && nextPokemon.evolutionStage === currentStage + 1) {
+                          const specialPokemon = getPokemonById(currentId + 2);
+                          if (specialPokemon && (specialPokemon.evolutionStage === 5 || specialPokemon.evolutionStage === 3)) {
+                            evolutionButtons.push(specialPokemon);
+                          }
+                        }
+                        
+                        // Check position +3 for MEGA/GMAX if we have stage 0 -> 1 -> 2 -> MEGA pattern
+                        if (currentStage === 0) {
+                          const stage1 = getPokemonById(currentId + 1);
+                          const stage2 = getPokemonById(currentId + 2);
+                          const special = getPokemonById(currentId + 3);
+                          
+                          if (stage1 && stage1.evolutionStage === 1 && 
+                              stage2 && stage2.evolutionStage === 2 && 
+                              special && (special.evolutionStage === 5 || special.evolutionStage === 3)) {
+                            // Don't add stage2 again if already added, but add special
+                            if (!evolutionButtons.find(p => p.id === special.id)) {
+                              evolutionButtons.push(special);
+                            }
+                          }
+                        }
+                      }
+                      
+                      // Always add current Pokemon to show complete evolution line
+                      evolutionButtons.push(selectedPokemon);
+                      
+                      // Sort buttons by evolution stage for proper order
+                      evolutionButtons.sort((a, b) => (a.evolutionStage || 0) - (b.evolutionStage || 0));
+                      
+                      if (evolutionButtons.length > 1) { // Show if there are other Pokemon besides current
+                        return (
+                          <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10">
+                            <h4 className="text-white/80 text-sm font-semibold mb-3 text-center">Evolution Line</h4>
+                            <div className="flex flex-wrap gap-2 justify-center">
+                              {evolutionButtons.map((evolution) => (
+                                <button
+                                  key={evolution.id}
+                                  onClick={() => setSelectedPokemon(evolution)}
+                                  disabled={evolution.id === selectedPokemon.id}
+                                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 min-w-0 ${
+                                    evolution.id === selectedPokemon.id
+                                      ? 'bg-yellow-400/30 border border-yellow-400 cursor-default'
+                                      : 'bg-white/10 border border-white/20 hover:bg-white/20 hover:border-white/40 hover:scale-[1.02] cursor-pointer'
+                                  }`}
+                                  title={`${evolution.name} - ${
+                                    evolution.evolutionStage === 0 ? 'Base Form' :
+                                    evolution.evolutionStage === 1 ? 'First Evolution' :
+                                    evolution.evolutionStage === 2 ? 'Second Evolution' :
+                                    evolution.evolutionStage === 3 ? 'GMAX Form' :
+                                    evolution.evolutionStage === 4 ? 'Legendary Form' :
+                                    evolution.evolutionStage === 5 ? 'MEGA Form' : 'Unknown Form'
+                                  } ${evolution.id === selectedPokemon.id ? '(Current)' : ''}`}
+                                >
+                                  <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/20 flex-shrink-0">
+                                    <img
+                                      src={evolution.imageUrl}
+                                      alt={evolution.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                  <div className="text-left min-w-0 flex-1">
+                                    <div className={`text-xs font-semibold ${
+                                      evolution.id === selectedPokemon.id ? 'text-yellow-300' : 'text-white'
+                                    }`}>
+                                      #{evolution.id.toString().padStart(3, '0')}
+                                    </div>
+                                    <div className={`text-xs font-medium truncate max-w-16 ${
+                                      evolution.id === selectedPokemon.id ? 'text-yellow-200' : 'text-white/90'
+                                    }`}>
+                                      {evolution.name}
+                                    </div>
+                                    <div className={`inline-block text-xs px-1.5 py-0.5 rounded font-bold text-white mt-0.5 ${
+                                      evolution.evolutionStage === 0 ? 'bg-green-500' :
+                                      evolution.evolutionStage === 1 ? 'bg-yellow-500' :
+                                      evolution.evolutionStage === 2 ? 'bg-red-500' :
+                                      evolution.evolutionStage === 3 ? 'bg-purple-500' :
+                                      evolution.evolutionStage === 4 ? 'bg-orange-500' :
+                                      evolution.evolutionStage === 5 ? 'bg-pink-500' : 'bg-gray-500'
+                                    }`}>
+                                      {evolution.evolutionStage === 0 ? 'Stage 0' :
+                                       evolution.evolutionStage === 1 ? 'Stage 1' :
+                                       evolution.evolutionStage === 2 ? 'Stage 2' :
+                                       evolution.evolutionStage === 3 ? 'GMAX' :
+                                       evolution.evolutionStage === 4 ? 'Legendary' :
+                                       evolution.evolutionStage === 5 ? 'MEGA' : `Stage ${evolution.evolutionStage}`}
+                                    </div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                     
                     {/* Actions Dropdown - Only show for Pokemon with artwork */}
                     {selectedPokemon.firebaseId && (
