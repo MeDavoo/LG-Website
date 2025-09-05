@@ -569,6 +569,26 @@ const Home = () => {
     return pokemonRatings[pokemonId]?.ratings[deviceId] || 0;
   };
 
+  // Tier system functions
+  const getTierFromRating = (averageRating: number): string => {
+    if (averageRating >= 9.3) return 'SS';
+    if (averageRating >= 8.3) return 'S';
+    if (averageRating >= 7.3) return 'A';
+    if (averageRating >= 6.3) return 'B';
+    if (averageRating >= 5.3) return 'C';
+    if (averageRating >= 4.0) return 'D';
+    return 'F';
+  };
+
+  const getTierImagePath = (tier: string): string => {
+    return `/tiers/${tier.toLowerCase()}.png`;
+  };
+
+  const getPokemonTier = (pokemonId: string): string => {
+    const rating = pokemonRatings[pokemonId]?.averageRating || 0;
+    return getTierFromRating(rating);
+  };
+
   // Function to show notifications
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type, show: true });
@@ -727,6 +747,10 @@ const Home = () => {
   const [uniqueOnly, setUniqueOnly] = useState(false);
   const [evolutionFilter, setEvolutionFilter] = useState<'all' | 'stage0' | 'stage1' | 'stage2' | 'gmax' | 'legendary' | 'mega' | 'evolved'>('all'); // Evolution filtering including new types
   const [userRatingFilter, setUserRatingFilter] = useState<number | null>(null); // Filter by user's own ratings
+  
+  // Rating sorting and tier display states
+  const [ratingSortOrder, setRatingSortOrder] = useState<'none' | 'ascending' | 'descending'>('none'); // Sort by global ranking
+  const [showTiers, setShowTiers] = useState(false); // Toggle tier letters display
 
   // User rating statistics
   const [userRatingStats, setUserRatingStats] = useState<{
@@ -746,7 +770,7 @@ const Home = () => {
   const allTypes = Array.from(new Set(pokemonSlots.filter(p => p.hasArt && p.types).flatMap(p => p.types!)));
 
   // Check if any filters are active
-  const hasActiveFilters = searchTerm || selectedTypes.length > 0 || selectedArtists.length > 0 || uniqueOnly || evolutionFilter !== 'all' || userRatingFilter !== null;
+  const hasActiveFilters = searchTerm || selectedTypes.length > 0 || selectedArtists.length > 0 || uniqueOnly || evolutionFilter !== 'all' || userRatingFilter !== null || ratingSortOrder !== 'none';
 
   // Filter pokemon based on current filters
   const filteredPokemon = pokemonSlots.filter(pokemon => {
@@ -829,22 +853,42 @@ const Home = () => {
     return true;
   });
 
+  // Sort filtered Pokemon by global ranking if rating sort is enabled
+  const sortedPokemon = (() => {
+    if (ratingSortOrder === 'none') {
+      return filteredPokemon;
+    }
+
+    const pokemonWithRanks = filteredPokemon.map(pokemon => ({
+      ...pokemon,
+      globalRank: pokemon.firebaseId ? globalRankings[pokemon.firebaseId] || Infinity : Infinity
+    }));
+
+    if (ratingSortOrder === 'ascending') {
+      // Lower rank numbers first (1, 2, 3...)
+      return pokemonWithRanks.sort((a, b) => a.globalRank - b.globalRank);
+    } else {
+      // Higher rank numbers first (descending by rank)
+      return pokemonWithRanks.sort((a, b) => b.globalRank - a.globalRank);
+    }
+  })();
+
   // Navigation functions
   const navigatePrevious = () => {
     if (!selectedPokemon) return;
     
-    const currentIndex = filteredPokemon.findIndex(p => p.id === selectedPokemon.id);
+    const currentIndex = sortedPokemon.findIndex(p => p.id === selectedPokemon.id);
     if (currentIndex > 0) {
-      setSelectedPokemon(filteredPokemon[currentIndex - 1]);
+      setSelectedPokemon(sortedPokemon[currentIndex - 1]);
     }
   };
 
   const navigateNext = () => {
     if (!selectedPokemon) return;
     
-    const currentIndex = filteredPokemon.findIndex(p => p.id === selectedPokemon.id);
-    if (currentIndex < filteredPokemon.length - 1) {
-      setSelectedPokemon(filteredPokemon[currentIndex + 1]);
+    const currentIndex = sortedPokemon.findIndex(p => p.id === selectedPokemon.id);
+    if (currentIndex < sortedPokemon.length - 1) {
+      setSelectedPokemon(sortedPokemon[currentIndex + 1]);
     }
   };
 
@@ -860,7 +904,7 @@ const Home = () => {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [selectedPokemon, filteredPokemon]);
+  }, [selectedPokemon, sortedPokemon]);
 
   const getTypeColor = (type: string) => {
     const colors: { [key: string]: string } = {
@@ -1097,6 +1141,62 @@ const Home = () => {
                 </div>
               </div>
               
+              {/* Rating Section */}
+              <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2 animate-filter-item" style={{animationDelay: '0.7s'}}>
+                <h3 className="text-white font-semibold mb-1 text-sm">Rating</h3>
+                
+                {/* Sort by Global Ranking */}
+                <div className="mb-2">
+                  <p className="text-white/70 text-xs mb-1">Sort by Global Rank:</p>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button
+                      onClick={() => setRatingSortOrder('none')}
+                      className={`px-1 py-1 rounded text-xs font-semibold transition-all ${
+                        ratingSortOrder === 'none'
+                          ? 'bg-gray-500 text-white'
+                          : 'bg-white/20 text-white/80 hover:bg-white/30'
+                      }`}
+                    >
+                      None
+                    </button>
+                    <button
+                      onClick={() => setRatingSortOrder('ascending')}
+                      className={`px-1 py-1 rounded text-xs font-semibold transition-all ${
+                        ratingSortOrder === 'ascending'
+                          ? 'bg-green-500 text-white'
+                          : 'bg-white/20 text-white/80 hover:bg-white/30'
+                      }`}
+                    >
+                      ↑ Asc
+                    </button>
+                    <button
+                      onClick={() => setRatingSortOrder('descending')}
+                      className={`px-1 py-1 rounded text-xs font-semibold transition-all ${
+                        ratingSortOrder === 'descending'
+                          ? 'bg-red-500 text-white'
+                          : 'bg-white/20 text-white/80 hover:bg-white/30'
+                      }`}
+                    >
+                      ↓ Desc
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Show Tiers Toggle */}
+                <div>
+                  <button
+                    onClick={() => setShowTiers(!showTiers)}
+                    className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
+                      showTiers
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-white/20 text-white/80 hover:bg-white/30'
+                    }`}
+                  >
+                    {showTiers ? '★ Hide Tiers' : '★ Show Tiers'}
+                  </button>
+                </div>
+              </div>
+              
               {/* Clear Filters */}
               {hasActiveFilters && (
                 <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2 animate-filter-item" style={{animationDelay: '0.8s'}}>
@@ -1108,6 +1208,8 @@ const Home = () => {
                       setUniqueOnly(false);
                       setEvolutionFilter('all');
                       setUserRatingFilter(null);
+                      setRatingSortOrder('none');
+                      setShowTiers(false);
                       setSelectedPokemon(null);
                     }}
                     className="w-full px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm"
@@ -1194,10 +1296,10 @@ const Home = () => {
                   </h2>
                   {!isPositionEditorMode && (
                     <div className="text-white/60 text-sm mb-2">
-                      <span className="text-yellow-300 font-bold">{filteredPokemon.filter(p => p.hasArt).length}</span> / 151 Pokemon Found
+                      <span className="text-yellow-300 font-bold">{sortedPokemon.filter(p => p.hasArt).length}</span> / 151 Pokemon Found
                       {hasActiveFilters && (
                         <span className="ml-2 text-blue-300">
-                          ({filteredPokemon.length} filtered)
+                          ({sortedPokemon.length} filtered)
                         </span>
                       )}
                       {userRatingFilter !== null && (
@@ -1276,136 +1378,153 @@ const Home = () => {
               {/* Pokemon List */}
               <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/20 p-2 overflow-y-auto custom-scrollbar" style={{maxHeight: 'calc(100vh - 170px)'}}>
                 <div className="space-y-2">
-                  {filteredPokemon.map((pokemon, index) => (
-                    <div
-                      key={pokemon.id}
-                      draggable={isPositionEditorMode && pokemon.hasArt}
-                      onDragStart={() => handleDragStart(pokemon)}
-                      onDragOver={handleDragOver}
-                      onDrop={() => handleDrop(pokemon)}
-                      onClick={() => {
-                        if (!isPositionEditorMode) {
-                          setSelectedPokemon(pokemon);
-                          setShowDeleteConfirm(false); // Reset delete confirmation when selecting new Pokemon
-                          setShowEditForm(false); // Reset edit form when selecting new Pokemon
-                          setShowActionsDropdown(false); // Reset actions dropdown when selecting new Pokemon
-                        }
-                      }}
-                      className={`flex items-center p-2 m-1 rounded-lg border transition-all duration-200 animate-fade-in-up ${
-                        isPositionEditorMode 
-                          ? pokemon.hasArt 
-                            ? 'cursor-grab active:cursor-grabbing bg-blue-500/10 border-blue-400/50 hover:bg-blue-500/20 hover:border-blue-400' 
-                            : 'cursor-not-allowed bg-gray-500/10 border-gray-400/20'
-                          : `cursor-pointer ${
-                              selectedPokemon?.id === pokemon.id
-                                ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
-                                : pokemon.hasArt 
-                                ? 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40' 
-                                : 'bg-white/5 border-white/10 hover:bg-white/10'
-                            }`
-                      } ${isDragging && draggedPokemon?.id === pokemon.id ? 'opacity-50 scale-95' : ''}`}
-                      style={{
-                        animationDelay: `${index * (0.03 * animationSpeedMultiplier)}s`
-                      }}
-                    >
-                      {/* Pokemon Number */}
-                      <div className="flex-shrink-0 w-10 text-center">
-                        <span className="text-white/80 font-bold text-xs">
-                          #{pokemon.id.toString().padStart(3, '0')}
-                        </span>
-                      </div>
-                      
-                      {/* Pokemon Image */}
-                      <div className="flex-shrink-0 w-12 h-12 ml-2">
-                        {pokemon.hasArt ? (
-                          <img
-                            src={pokemon.imageUrl}
-                            alt={pokemon.name}
-                            className="w-full h-full object-cover rounded-lg"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-white/10 rounded-lg flex items-center justify-center">
-                            <span className="text-white/40 text-xl">?</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Pokemon Info */}
-                      <div className="flex-1 ml-3">
-                        <h3 className="text-white font-semibold text-base">
-                          {pokemon.name}
-                        </h3>
-                        {pokemon.hasArt ? (
-                          <div className="flex items-center space-x-3">
-                            <p className="text-white/60 text-xs">
-                              by {pokemon.artist}
-                            </p>
-                            {pokemon.types && (
-                              <div className="flex gap-1">
-                                {pokemon.types.slice(0, 2).map((type) => (
-                                  <span
-                                    key={type}
-                                    className={`px-1.5 py-0.5 rounded text-xs font-semibold text-white ${getTypeColor(type)}`}
-                                  >
-                                    {type}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <p className="text-white/40 text-xs">No artwork yet</p>
-                        )}
-                      </div>
-                      
-                      {/* Special Indicators */}
-                      <div className="flex-shrink-0 flex flex-col items-end space-y-1">
-                        {/* Position Editor Drag Indicator */}
-                        {isPositionEditorMode && pokemon.hasArt && (
-                          <div className="flex items-center text-blue-300 text-xs">
-                            <span className="mr-1">⋮⋮</span>
-                            <span>Drag</span>
-                          </div>
-                        )}
-                        {isPositionEditorMode && !pokemon.hasArt && (
-                          <div className="flex items-center text-gray-500 text-xs">
-                            <span className="mr-1">✕</span>
-                            <span>Empty</span>
-                          </div>
-                        )}
-                        {pokemon.firebaseId && (
-                          globalRankings[pokemon.firebaseId] ? (
-                            <span className="bg-yellow-500 text-black px-1.5 py-0.5 rounded text-xs font-bold">
-                              #{globalRankings[pokemon.firebaseId]}
-                            </span>
-                          ) : (
-                            <span className="bg-gray-500 text-white px-1.5 py-0.5 rounded text-xs font-bold">
-                              Unranked
-                            </span>
-                          )
-                        )}
-                        {pokemon.evolutionStage !== undefined && (
-                          <span className={`px-1.5 py-0.5 rounded text-xs font-bold text-white ${
-                            pokemon.evolutionStage === 0 ? 'bg-green-500' :
-                            pokemon.evolutionStage === 1 ? 'bg-yellow-500' :
-                            pokemon.evolutionStage === 2 ? 'bg-red-500' :
-                            pokemon.evolutionStage === 3 ? 'bg-purple-500' :
-                            pokemon.evolutionStage === 4 ? 'bg-orange-500' :
-                            pokemon.evolutionStage === 5 ? 'bg-pink-500' : 'bg-gray-500'
-                          }`}>
-                            {pokemon.evolutionStage === 0 ? 'Stage 0' :
-                             pokemon.evolutionStage === 1 ? 'Stage 1' :
-                             pokemon.evolutionStage === 2 ? 'Stage 2' :
-                             pokemon.evolutionStage === 3 ? 'GMAX' :
-                             pokemon.evolutionStage === 4 ? 'Legendary' :
-                             pokemon.evolutionStage === 5 ? 'MEGA' : `Stage ${pokemon.evolutionStage}`}
+                  {sortedPokemon.map((pokemon, index) => (
+                    <div key={pokemon.id} className={`flex items-center transition-all duration-300 ease-in-out ${showTiers ? 'gap-2' : 'gap-0'}`}>
+                      {/* Pokemon List Item - Shrinks to make room for tier images */}
+                      <div
+                        draggable={isPositionEditorMode && pokemon.hasArt}
+                        onDragStart={() => handleDragStart(pokemon)}
+                        onDragOver={handleDragOver}
+                        onDrop={() => handleDrop(pokemon)}
+                        onClick={() => {
+                          if (!isPositionEditorMode) {
+                            setSelectedPokemon(pokemon);
+                            setShowDeleteConfirm(false);
+                            setShowEditForm(false);
+                            setShowActionsDropdown(false);
+                          }
+                        }}
+                        className={`flex items-center p-2 m-1 rounded-lg border transition-all duration-300 ease-in-out animate-fade-in-up ${showTiers ? 'flex-1' : 'w-full'} ${
+                          isPositionEditorMode 
+                            ? pokemon.hasArt 
+                              ? 'cursor-grab active:cursor-grabbing bg-blue-500/10 border-blue-400/50 hover:bg-blue-500/20 hover:border-blue-400' 
+                              : 'cursor-not-allowed bg-gray-500/10 border-gray-400/20'
+                            : `cursor-pointer ${
+                                selectedPokemon?.id === pokemon.id
+                                  ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
+                                  : pokemon.hasArt 
+                                  ? 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40' 
+                                  : 'bg-white/5 border-white/10 hover:bg-white/10'
+                              }`
+                        } ${isDragging && draggedPokemon?.id === pokemon.id ? 'opacity-50 scale-95' : ''}`}
+                        style={{
+                          animationDelay: `${index * (0.03 * animationSpeedMultiplier)}s`
+                        }}
+                      >
+                        {/* Pokemon Number */}
+                        <div className="flex-shrink-0 w-10 text-center">
+                          <span className="text-white/80 font-bold text-xs">
+                            #{pokemon.id.toString().padStart(3, '0')}
                           </span>
-                        )}
+                        </div>
+                        
+                        {/* Pokemon Image */}
+                        <div className="flex-shrink-0 w-12 h-12 ml-2 relative">
+                          {pokemon.hasArt ? (
+                            <img
+                              src={pokemon.imageUrl}
+                              alt={pokemon.name}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-white/10 rounded-lg flex items-center justify-center">
+                              <span className="text-white/40 text-xl">?</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Pokemon Info */}
+                        <div className="flex-1 ml-3">
+                          <h3 className="text-white font-semibold text-base">
+                            {pokemon.name}
+                          </h3>
+                          {pokemon.hasArt ? (
+                            <div className="flex items-center space-x-3">
+                              <p className="text-white/60 text-xs">
+                                by {pokemon.artist}
+                              </p>
+                              {pokemon.types && (
+                                <div className="flex gap-1">
+                                  {pokemon.types.slice(0, 2).map((type) => (
+                                    <span
+                                      key={type}
+                                      className={`px-1.5 py-0.5 rounded text-xs font-semibold text-white ${getTypeColor(type)}`}
+                                    >
+                                      {type}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-white/40 text-xs">No artwork yet</p>
+                          )}
+                        </div>
+                        
+                        {/* Special Indicators */}
+                        <div className="flex-shrink-0 flex flex-col items-end space-y-1">
+                          {/* Position Editor Drag Indicator */}
+                          {isPositionEditorMode && pokemon.hasArt && (
+                            <div className="flex items-center text-blue-300 text-xs">
+                              <span className="mr-1">⋮⋮</span>
+                              <span>Drag</span>
+                            </div>
+                          )}
+                          {isPositionEditorMode && !pokemon.hasArt && (
+                            <div className="flex items-center text-gray-500 text-xs">
+                              <span className="mr-1">✕</span>
+                              <span>Empty</span>
+                            </div>
+                          )}
+                          {pokemon.firebaseId && (
+                            globalRankings[pokemon.firebaseId] ? (
+                              <span className="bg-yellow-500 text-black px-1.5 py-0.5 rounded text-xs font-bold">
+                                #{globalRankings[pokemon.firebaseId]}
+                              </span>
+                            ) : (
+                              <span className="bg-gray-500 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                                Unranked
+                              </span>
+                            )
+                          )}
+                          {pokemon.evolutionStage !== undefined && (
+                            <span className={`px-1.5 py-0.5 rounded text-xs font-bold text-white ${
+                              pokemon.evolutionStage === 0 ? 'bg-green-500' :
+                              pokemon.evolutionStage === 1 ? 'bg-yellow-500' :
+                              pokemon.evolutionStage === 2 ? 'bg-red-500' :
+                              pokemon.evolutionStage === 3 ? 'bg-purple-500' :
+                              pokemon.evolutionStage === 4 ? 'bg-orange-500' :
+                              pokemon.evolutionStage === 5 ? 'bg-pink-500' : 'bg-gray-500'
+                            }`}>
+                              {pokemon.evolutionStage === 0 ? 'Stage 0' :
+                               pokemon.evolutionStage === 1 ? 'Stage 1' :
+                               pokemon.evolutionStage === 2 ? 'Stage 2' :
+                               pokemon.evolutionStage === 3 ? 'GMAX' :
+                               pokemon.evolutionStage === 4 ? 'Legendary' :
+                               pokemon.evolutionStage === 5 ? 'MEGA' : `Stage ${pokemon.evolutionStage}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Tier Image - Separate container that appears next to list item */}
+                      <div className={`flex-shrink-0 flex items-center justify-center transition-all duration-300 ease-in-out ${
+                        showTiers ? 'w-14 h-14 opacity-100' : 'w-0 h-14 opacity-0 overflow-hidden'
+                      }`}>
+                        {showTiers && pokemon.firebaseId && pokemonRatings[pokemon.firebaseId]?.averageRating ? (
+                          <img
+                            src={getTierImagePath(getPokemonTier(pokemon.firebaseId))}
+                            alt={`${getPokemonTier(pokemon.firebaseId)} Tier`}
+                            className="w-12 h-12 object-contain transition-transform duration-300 ease-in-out"
+                          />
+                        ) : showTiers ? (
+                          <div className="w-12 h-12"></div>
+                        ) : null}
                       </div>
                     </div>
                   ))}
                   
-                  {filteredPokemon.length === 0 && (
+                  {sortedPokemon.length === 0 && (
                     <div className="text-center py-8">
                       <p className="text-white/60">No Pokemon match your current filters</p>
                     </div>
@@ -1423,7 +1542,18 @@ const Home = () => {
                 <h2 className="text-white font-bold text-base mb-2">DETAILS</h2>
               </div>
               
-              <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-3 animate-filter-item" style={{animationDelay: '0.5s'}}>
+              <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-3 animate-filter-item relative" style={{animationDelay: '0.5s'}}>
+                {/* Tier Image - Top Right Corner of Details Section */}
+                {showTiers && selectedPokemon && selectedPokemon.firebaseId && pokemonRatings[selectedPokemon.firebaseId]?.averageRating && (
+                  <div className="absolute top-3 right-3 z-20 bg-white-800 backdrop-blur-sm rounded-lg p-2 border border-white/30 shadow-lg">
+                    <img
+                      src={getTierImagePath(getPokemonTier(selectedPokemon.firebaseId))}
+                      alt={`${getPokemonTier(selectedPokemon.firebaseId)} Tier`}
+                      className="w-14 h-14 object-contain"
+                    />
+                  </div>
+                )}
+                
                 {selectedPokemon && selectedPokemon.hasArt ? (
                   <div className="space-y-2">
                     {/* Large Image with 3D Effect and Navigation */}
@@ -1431,7 +1561,7 @@ const Home = () => {
                       {/* Previous Arrow */}
                       <button
                         onClick={navigatePrevious}
-                        disabled={!selectedPokemon || filteredPokemon.findIndex(p => p.id === selectedPokemon.id) === 0}
+                        disabled={!selectedPokemon || sortedPokemon.findIndex(p => p.id === selectedPokemon.id) === 0}
                         className="absolute left-0 top-1/2 transform -translate-y-1/2 z-10 bg-white/20 hover:bg-white/30 disabled:bg-gray-500/20 disabled:cursor-not-allowed backdrop-blur-md rounded-full p-3 transition-all duration-200 group"
                         title="Previous Pokemon (Left Arrow)"
                       >
@@ -1474,7 +1604,7 @@ const Home = () => {
                       {/* Next Arrow */}
                       <button
                         onClick={navigateNext}
-                        disabled={!selectedPokemon || filteredPokemon.findIndex(p => p.id === selectedPokemon.id) === filteredPokemon.length - 1}
+                        disabled={!selectedPokemon || sortedPokemon.findIndex(p => p.id === selectedPokemon.id) === sortedPokemon.length - 1}
                         className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-white/20 hover:bg-white/30 disabled:bg-gray-500/20 disabled:cursor-not-allowed backdrop-blur-md rounded-full p-3 transition-all duration-200 group"
                         title="Next Pokemon (Right Arrow)"
                       >
@@ -1545,9 +1675,16 @@ const Home = () => {
                       <div className="text-center">
                         {selectedPokemon.firebaseId && (
                           globalRankings[selectedPokemon.firebaseId] ? (
-                            <p className="text-yellow-300 text-sm font-semibold mt-1">
-                              Global Rank: #{globalRankings[selectedPokemon.firebaseId]}
-                            </p>
+                            <>
+                              <p className="text-yellow-300 text-sm font-semibold mt-1">
+                                Global Rank: #{globalRankings[selectedPokemon.firebaseId]}
+                              </p>
+                              {pokemonRatings[selectedPokemon.firebaseId]?.averageRating && (
+                                <p className="text-yellow-200 text-xs font-medium">
+                                  Average: {pokemonRatings[selectedPokemon.firebaseId].averageRating.toFixed(1)}★
+                                </p>
+                              )}
+                            </>
                           ) : (
                             <p className="text-gray-400 text-sm font-semibold mt-1">
                               Unranked - No votes yet
