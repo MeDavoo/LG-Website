@@ -384,17 +384,25 @@ export const getPokemonRating = async (pokemonId: string): Promise<PokemonRating
   }
 };
 
-// Get global rankings of all Pokemon based on total points
+// Get global rankings of all Pokemon based on average star rating (with total points as tiebreaker)
 export const getGlobalRankings = async (): Promise<{ pokemonId: string; rank: number; totalPoints: number }[]> => {
   try {
     const ratings = await getAllRatings();
     const pokemonRatings = Object.values(ratings).map(rating => ({
       pokemonId: rating.pokemonId,
+      averageRating: rating.averageRating || 0,
       totalPoints: rating.totalPoints || 0
     }));
     
-    // Sort by total points (highest first)
-    pokemonRatings.sort((a, b) => b.totalPoints - a.totalPoints);
+    // Sort by average star rating first (highest first), then by total points as tiebreaker (highest first)
+    pokemonRatings.sort((a, b) => {
+      // Primary sort: Average rating (highest first)
+      if (a.averageRating !== b.averageRating) {
+        return b.averageRating - a.averageRating;
+      }
+      // Tiebreaker: Total points (highest first)
+      return b.totalPoints - a.totalPoints;
+    });
     
     // Assign ranks
     return pokemonRatings.map((pokemon, index) => ({
