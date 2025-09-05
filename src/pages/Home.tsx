@@ -572,10 +572,10 @@ const Home = () => {
   // Tier system functions
   const getTierFromRating = (averageRating: number): string => {
     if (averageRating >= 9.3) return 'SS';
-    if (averageRating >= 8.3) return 'S';
-    if (averageRating >= 7.3) return 'A';
-    if (averageRating >= 6.3) return 'B';
-    if (averageRating >= 5.3) return 'C';
+    if (averageRating >= 8.0) return 'S';
+    if (averageRating >= 7.0) return 'A';
+    if (averageRating >= 6.0) return 'B';
+    if (averageRating >= 5.0) return 'C';
     if (averageRating >= 4.0) return 'D';
     return 'F';
   };
@@ -751,6 +751,30 @@ const Home = () => {
   // Rating sorting and tier display states
   const [ratingSortOrder, setRatingSortOrder] = useState<'none' | 'ascending' | 'descending'>('none'); // Sort by global ranking
   const [showTiers, setShowTiers] = useState(false); // Toggle tier letters display
+
+  // Collapsible filter sections state
+  const [collapsedSections, setCollapsedSections] = useState<{
+    types: boolean;
+    artists: boolean;
+    evolution: boolean;
+    rating: boolean;
+  }>({
+    types: false,
+    artists: false,
+    evolution: false,
+    rating: false
+  });
+
+  // Rating distribution dropdown state (closed by default)
+  const [isRatingDistributionCollapsed, setIsRatingDistributionCollapsed] = useState(true);
+
+  // Toggle collapse state for a section
+  const toggleSection = (section: keyof typeof collapsedSections) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   // User rating statistics
   const [userRatingStats, setUserRatingStats] = useState<{
@@ -963,238 +987,280 @@ const Home = () => {
               
               {/* Types */}
               <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2 animate-filter-item" style={{animationDelay: '0.4s'}}>
-                <h3 className="text-white font-semibold mb-1 text-sm">Types</h3>
-                <div className="grid grid-cols-2 gap-1">
-                  {allTypes.map(type => (
-                    <button
-                      key={type}
-                      onClick={() => {
-                        if (selectedTypes.includes(type)) {
-                          setSelectedTypes(selectedTypes.filter(t => t !== type));
-                        } else {
-                          setSelectedTypes([...selectedTypes, type]);
-                        }
-                      }}
-                      className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
-                        selectedTypes.includes(type)
-                          ? `${getTypeColor(type)} text-white scale-105`
-                          : 'bg-white/20 text-white/80 hover:bg-white/30'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-white font-semibold text-sm">Types</h3>
+                  <button
+                    onClick={() => toggleSection('types')}
+                    className="text-white/70 hover:text-white transition-colors text-sm"
+                  >
+                    {collapsedSections.types ? '▼' : '▲'}
+                  </button>
                 </div>
+                {!collapsedSections.types && (
+                  <div className="grid grid-cols-3 gap-1">
+                    {allTypes.map(type => (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          if (selectedTypes.includes(type)) {
+                            setSelectedTypes(selectedTypes.filter(t => t !== type));
+                          } else {
+                            setSelectedTypes([...selectedTypes, type]);
+                          }
+                        }}
+                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                          selectedTypes.includes(type)
+                            ? `${getTypeColor(type)} text-white scale-105`
+                            : 'bg-white/20 text-white/80 hover:bg-white/30'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               
               {/* Artists & Uniques - Combined */}
               <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2 animate-filter-item" style={{animationDelay: '0.5s'}}>
-                <div className="grid grid-cols-2 gap-2">
-                  {/* Artists Section */}
-                  <div>
-                    <h3 className="text-white font-semibold mb-1 text-sm">Artists</h3>
-                    <div className="space-y-1">
-                      {['DAVE', 'JOAO', 'GUTO'].map(artist => (
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-white font-semibold text-sm">Artists & Uniques</h3>
+                  <button
+                    onClick={() => toggleSection('artists')}
+                    className="text-white/70 hover:text-white transition-colors text-sm"
+                  >
+                    {collapsedSections.artists ? '▼' : '▲'}
+                  </button>
+                </div>
+                {!collapsedSections.artists && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Artists Section */}
+                    <div>
+                      <h3 className="text-white font-semibold mb-1 text-sm">Artists</h3>
+                      <div className="space-y-1">
+                        {['DAVE', 'JOAO', 'GUTO'].map(artist => (
+                          <button
+                            key={artist}
+                            onClick={() => {
+                              if (selectedArtists.includes(artist)) {
+                                setSelectedArtists(selectedArtists.filter(a => a !== artist));
+                              } else {
+                                setSelectedArtists([...selectedArtists, artist]);
+                              }
+                            }}
+                            className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
+                              selectedArtists.includes(artist)
+                                ? 'bg-yellow-400 text-black'
+                                : 'bg-white/20 text-white/80 hover:bg-white/30'
+                            }`}
+                          >
+                            {artist}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Uniques Section */}
+                    <div>
+                      <h3 className="text-white font-semibold mb-1 text-sm">Uniques</h3>
+                      <div className="space-y-1">
                         <button
-                          key={artist}
                           onClick={() => {
-                            if (selectedArtists.includes(artist)) {
-                              setSelectedArtists(selectedArtists.filter(a => a !== artist));
+                            setUniqueOnly(false);
+                            if (selectedTypes.includes('U0')) {
+                              setSelectedTypes(selectedTypes.filter(t => t !== 'U0'));
                             } else {
-                              setSelectedArtists([...selectedArtists, artist]);
+                              setSelectedTypes([...selectedTypes.filter(t => !['U0', 'U1', 'U2'].includes(t)), 'U0']);
                             }
                           }}
                           className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
-                            selectedArtists.includes(artist)
-                              ? 'bg-yellow-400 text-black'
+                            selectedTypes.includes('U0')
+                              ? 'bg-gray-500 text-white'
                               : 'bg-white/20 text-white/80 hover:bg-white/30'
                           }`}
                         >
-                          {artist}
+                          Doesn't Evolve
                         </button>
-                      ))}
+                        <button
+                          onClick={() => {
+                            if (selectedTypes.includes('U1')) {
+                              setSelectedTypes(selectedTypes.filter(t => t !== 'U1'));
+                            } else {
+                              setSelectedTypes([...selectedTypes.filter(t => !['U0', 'U1', 'U2'].includes(t)), 'U1']);
+                            }
+                          }}
+                          className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
+                            selectedTypes.includes('U1')
+                              ? 'bg-gray-500 text-white'
+                              : 'bg-white/20 text-white/80 hover:bg-white/30'
+                          }`}
+                        >
+                          Evolves Once
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (selectedTypes.includes('U2')) {
+                              setSelectedTypes(selectedTypes.filter(t => t !== 'U2'));
+                            } else {
+                              setSelectedTypes([...selectedTypes.filter(t => !['U0', 'U1', 'U2'].includes(t)), 'U2']);
+                            }
+                          }}
+                          className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
+                            selectedTypes.includes('U2')
+                              ? 'bg-gray-500 text-white'
+                              : 'bg-white/20 text-white/80 hover:bg-white/30'
+                          }`}
+                        >
+                          Evolves Twice
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  
-                  {/* Uniques Section */}
-                  <div>
-                    <h3 className="text-white font-semibold mb-1 text-sm">Uniques</h3>
-                    <div className="space-y-1">
-                      <button
-                        onClick={() => {
-                          setUniqueOnly(false);
-                          if (selectedTypes.includes('U0')) {
-                            setSelectedTypes(selectedTypes.filter(t => t !== 'U0'));
-                          } else {
-                            setSelectedTypes([...selectedTypes.filter(t => !['U0', 'U1', 'U2'].includes(t)), 'U0']);
-                          }
-                        }}
-                        className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
-                          selectedTypes.includes('U0')
-                            ? 'bg-gray-500 text-white'
-                            : 'bg-white/20 text-white/80 hover:bg-white/30'
-                        }`}
-                      >
-                        Doesn't Evolve
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (selectedTypes.includes('U1')) {
-                            setSelectedTypes(selectedTypes.filter(t => t !== 'U1'));
-                          } else {
-                            setSelectedTypes([...selectedTypes.filter(t => !['U0', 'U1', 'U2'].includes(t)), 'U1']);
-                          }
-                        }}
-                        className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
-                          selectedTypes.includes('U1')
-                            ? 'bg-gray-500 text-white'
-                            : 'bg-white/20 text-white/80 hover:bg-white/30'
-                        }`}
-                      >
-                        Evolves Once
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (selectedTypes.includes('U2')) {
-                            setSelectedTypes(selectedTypes.filter(t => t !== 'U2'));
-                          } else {
-                            setSelectedTypes([...selectedTypes.filter(t => !['U0', 'U1', 'U2'].includes(t)), 'U2']);
-                          }
-                        }}
-                        className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
-                          selectedTypes.includes('U2')
-                            ? 'bg-gray-500 text-white'
-                            : 'bg-white/20 text-white/80 hover:bg-white/30'
-                        }`}
-                      >
-                        Evolves Twice
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
               
               {/* Evolution Stages */}
               <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2 animate-filter-item" style={{animationDelay: '0.7s'}}>
-                <h3 className="text-white font-semibold mb-1">Evolution</h3>
-                <div className="grid grid-cols-2 gap-1">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-white font-semibold text-sm">Evolution</h3>
                   <button
-                    onClick={() => setEvolutionFilter(evolutionFilter === 'stage0' ? 'all' : 'stage0')}
-                    className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
-                      evolutionFilter === 'stage0'
-                        ? 'bg-green-500 text-white'
-                        : 'bg-white/20 text-white/80 hover:bg-white/30'
-                    }`}
+                    onClick={() => toggleSection('evolution')}
+                    className="text-white/70 hover:text-white transition-colors text-sm"
                   >
-                    Stage 0
-                  </button>
-                  <button
-                    onClick={() => setEvolutionFilter(evolutionFilter === 'stage1' ? 'all' : 'stage1')}
-                    className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
-                      evolutionFilter === 'stage1'
-                        ? 'bg-yellow-500 text-white'
-                        : 'bg-white/20 text-white/80 hover:bg-white/30'
-                    }`}
-                  >
-                    Stage 1
-                  </button>
-                  <button
-                    onClick={() => setEvolutionFilter(evolutionFilter === 'stage2' ? 'all' : 'stage2')}
-                    className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
-                      evolutionFilter === 'stage2'
-                        ? 'bg-red-500 text-white'
-                        : 'bg-white/20 text-white/80 hover:bg-white/30'
-                    }`}
-                  >
-                    Stage 2
-                  </button>
-                  <button
-                    onClick={() => setEvolutionFilter(evolutionFilter === 'gmax' ? 'all' : 'gmax')}
-                    className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
-                      evolutionFilter === 'gmax'
-                        ? 'bg-purple-500 text-white'
-                        : 'bg-white/20 text-white/80 hover:bg-white/30'
-                    }`}
-                  >
-                    GMAX
-                  </button>
-                  <button
-                    onClick={() => setEvolutionFilter(evolutionFilter === 'legendary' ? 'all' : 'legendary')}
-                    className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
-                      evolutionFilter === 'legendary'
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-white/20 text-white/80 hover:bg-white/30'
-                    }`}
-                  >
-                    Legendary
-                  </button>
-                  <button
-                    onClick={() => setEvolutionFilter(evolutionFilter === 'mega' ? 'all' : 'mega')}
-                    className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
-                      evolutionFilter === 'mega'
-                        ? 'bg-pink-500 text-white'
-                        : 'bg-white/20 text-white/80 hover:bg-white/30'
-                    }`}
-                  >
-                    MEGA
+                    {collapsedSections.evolution ? '▼' : '▲'}
                   </button>
                 </div>
-              </div>
-              
-              {/* Rating Section */}
-              <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2 animate-filter-item" style={{animationDelay: '0.7s'}}>
-                <h3 className="text-white font-semibold mb-1 text-sm">Rating</h3>
-                
-                {/* Sort by Global Ranking */}
-                <div className="mb-2">
-                  <p className="text-white/70 text-xs mb-1">Sort by Global Rank:</p>
-                  <div className="grid grid-cols-3 gap-1">
+                {!collapsedSections.evolution && (
+                  <div className="grid grid-cols-2 gap-1">
                     <button
-                      onClick={() => setRatingSortOrder('none')}
-                      className={`px-1 py-1 rounded text-xs font-semibold transition-all ${
-                        ratingSortOrder === 'none'
-                          ? 'bg-gray-500 text-white'
-                          : 'bg-white/20 text-white/80 hover:bg-white/30'
-                      }`}
-                    >
-                      None
-                    </button>
-                    <button
-                      onClick={() => setRatingSortOrder('ascending')}
-                      className={`px-1 py-1 rounded text-xs font-semibold transition-all ${
-                        ratingSortOrder === 'ascending'
+                      onClick={() => setEvolutionFilter(evolutionFilter === 'stage0' ? 'all' : 'stage0')}
+                      className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                        evolutionFilter === 'stage0'
                           ? 'bg-green-500 text-white'
                           : 'bg-white/20 text-white/80 hover:bg-white/30'
                       }`}
                     >
-                      ↑ Asc
+                      Stage 0
                     </button>
                     <button
-                      onClick={() => setRatingSortOrder('descending')}
-                      className={`px-1 py-1 rounded text-xs font-semibold transition-all ${
-                        ratingSortOrder === 'descending'
+                      onClick={() => setEvolutionFilter(evolutionFilter === 'stage1' ? 'all' : 'stage1')}
+                      className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                        evolutionFilter === 'stage1'
+                          ? 'bg-yellow-500 text-white'
+                          : 'bg-white/20 text-white/80 hover:bg-white/30'
+                      }`}
+                    >
+                      Stage 1
+                    </button>
+                    <button
+                      onClick={() => setEvolutionFilter(evolutionFilter === 'stage2' ? 'all' : 'stage2')}
+                      className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                        evolutionFilter === 'stage2'
                           ? 'bg-red-500 text-white'
                           : 'bg-white/20 text-white/80 hover:bg-white/30'
                       }`}
                     >
-                      ↓ Desc
+                      Stage 2
+                    </button>
+                    <button
+                      onClick={() => setEvolutionFilter(evolutionFilter === 'gmax' ? 'all' : 'gmax')}
+                      className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                        evolutionFilter === 'gmax'
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-white/20 text-white/80 hover:bg-white/30'
+                      }`}
+                    >
+                      GMAX
+                    </button>
+                    <button
+                      onClick={() => setEvolutionFilter(evolutionFilter === 'legendary' ? 'all' : 'legendary')}
+                      className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                        evolutionFilter === 'legendary'
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-white/20 text-white/80 hover:bg-white/30'
+                      }`}
+                    >
+                      Legendary
+                    </button>
+                    <button
+                      onClick={() => setEvolutionFilter(evolutionFilter === 'mega' ? 'all' : 'mega')}
+                      className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                        evolutionFilter === 'mega'
+                          ? 'bg-pink-500 text-white'
+                          : 'bg-white/20 text-white/80 hover:bg-white/30'
+                      }`}
+                    >
+                      MEGA
                     </button>
                   </div>
-                </div>
-                
-                {/* Show Tiers Toggle */}
-                <div>
+                )}
+              </div>
+              
+              {/* Rating Section */}
+              <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2 animate-filter-item" style={{animationDelay: '0.7s'}}>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-white font-semibold text-sm">Rating</h3>
                   <button
-                    onClick={() => setShowTiers(!showTiers)}
-                    className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
-                      showTiers
-                        ? 'bg-purple-500 text-white'
-                        : 'bg-white/20 text-white/80 hover:bg-white/30'
-                    }`}
+                    onClick={() => toggleSection('rating')}
+                    className="text-white/70 hover:text-white transition-colors text-sm"
                   >
-                    {showTiers ? '★ Hide Tiers' : '★ Show Tiers'}
+                    {collapsedSections.rating ? '▼' : '▲'}
                   </button>
                 </div>
+                {!collapsedSections.rating && (
+                  <>
+                    {/* Sort by Global Ranking */}
+                    <div className="mb-2">
+                      <p className="text-white/70 text-xs mb-1">Sort by Global Rank:</p>
+                      <div className="grid grid-cols-3 gap-1">
+                        <button
+                          onClick={() => setRatingSortOrder('none')}
+                          className={`px-1 py-1 rounded text-xs font-semibold transition-all ${
+                            ratingSortOrder === 'none'
+                              ? 'bg-gray-500 text-white'
+                              : 'bg-white/20 text-white/80 hover:bg-white/30'
+                          }`}
+                        >
+                          None
+                        </button>
+                        <button
+                          onClick={() => setRatingSortOrder('ascending')}
+                          className={`px-1 py-1 rounded text-xs font-semibold transition-all ${
+                            ratingSortOrder === 'ascending'
+                              ? 'bg-green-500 text-white'
+                              : 'bg-white/20 text-white/80 hover:bg-white/30'
+                          }`}
+                        >
+                          ↑ Asc
+                        </button>
+                        <button
+                          onClick={() => setRatingSortOrder('descending')}
+                          className={`px-1 py-1 rounded text-xs font-semibold transition-all ${
+                            ratingSortOrder === 'descending'
+                              ? 'bg-red-500 text-white'
+                              : 'bg-white/20 text-white/80 hover:bg-white/30'
+                          }`}
+                        >
+                          ↓ Desc
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Show Tiers Toggle */}
+                    <div>
+                      <button
+                        onClick={() => setShowTiers(!showTiers)}
+                        className={`w-full px-2 py-1 rounded text-xs font-semibold transition-all ${
+                          showTiers
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-white/20 text-white/80 hover:bg-white/30'
+                        }`}
+                      >
+                        {showTiers ? '★ Hide Tiers' : '★ Show Tiers'}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
               
               {/* Clear Filters */}
@@ -1234,45 +1300,58 @@ const Home = () => {
                   </div>
                 </div>
                 
-                {/* Rating Distribution */}
-                <div className="space-y-1">
-                  {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(star => (
-                    <div key={star} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center">
-                        <span className="text-yellow-300 w-4 text-center font-bold">{star}</span>
-                        <svg
-                          className="w-3 h-3 text-yellow-300 ml-1"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (userRatingFilter === star) {
-                            // If already filtering by this star, clear the filter
-                            setUserRatingFilter(null);
-                          } else {
-                            // Set filter to this star rating
-                            setUserRatingFilter(star);
-                          }
-                        }}
-                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
-                          userRatingFilter === star
-                            ? 'bg-blue-500 text-white'
-                            : userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10] > 0
-                            ? 'bg-white/20 text-white/90 hover:bg-white/30'
-                            : 'bg-white/10 text-white/50 cursor-default'
-                        }`}
-                        disabled={userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10] === 0}
-                        title={userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10] > 0 ? `Filter Pokemon you rated ${star} stars` : `No Pokemon rated ${star} stars`}
-                      >
-                        {userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10]}
-                      </button>
-                    </div>
-                  ))}
+                {/* Rating Distribution Header with Toggle */}
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-white font-semibold text-xs">Rating Distribution</h4>
+                  <button
+                    onClick={() => setIsRatingDistributionCollapsed(!isRatingDistributionCollapsed)}
+                    className="text-white/70 hover:text-white transition-colors text-sm"
+                  >
+                    {isRatingDistributionCollapsed ? '▼' : '▲'}
+                  </button>
                 </div>
+                
+                {/* Rating Distribution Content (Collapsible) */}
+                {!isRatingDistributionCollapsed && (
+                  <div className="space-y-1">
+                    {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(star => (
+                      <div key={star} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center">
+                          <span className="text-yellow-300 w-4 text-center font-bold">{star}</span>
+                          <svg
+                            className="w-3 h-3 text-yellow-300 ml-1"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (userRatingFilter === star) {
+                              // If already filtering by this star, clear the filter
+                              setUserRatingFilter(null);
+                            } else {
+                              // Set filter to this star rating
+                              setUserRatingFilter(star);
+                            }
+                          }}
+                          className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                            userRatingFilter === star
+                              ? 'bg-blue-500 text-white'
+                              : userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10] > 0
+                              ? 'bg-white/20 text-white/90 hover:bg-white/30'
+                              : 'bg-white/10 text-white/50 cursor-default'
+                          }`}
+                          disabled={userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10] === 0}
+                          title={userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10] > 0 ? `Filter Pokemon you rated ${star} stars` : `No Pokemon rated ${star} stars`}
+                        >
+                          {userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10]}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 
                 {userRatingStats.totalRatings === 0 && (
                   <div className="text-center text-white/50 text-xs mt-2">
