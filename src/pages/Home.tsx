@@ -1199,7 +1199,7 @@ const Home = () => {
               {/* Rating Section */}
               <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2 animate-filter-item" style={{animationDelay: '0.7s'}}>
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-white font-semibold text-sm">Rating</h3>
+                  <h3 className="text-white font-semibold text-sm">Global Ranking</h3>
                   <button
                     onClick={() => toggleSection('rating')}
                     className="text-white/70 hover:text-white transition-colors text-sm"
@@ -1211,7 +1211,6 @@ const Home = () => {
                   <>
                     {/* Sort by Global Ranking */}
                     <div className="mb-2">
-                      <p className="text-white/70 text-xs mb-1">Sort by Global Rank:</p>
                       <div className="grid grid-cols-3 gap-1">
                         <button
                           onClick={() => setRatingSortOrder('none')}
@@ -1557,9 +1556,16 @@ const Home = () => {
                           )}
                           {pokemon.firebaseId && (
                             globalRankings[pokemon.firebaseId] ? (
-                              <span className="bg-yellow-500 text-black px-1.5 py-0.5 rounded text-xs font-bold">
-                                #{globalRankings[pokemon.firebaseId]}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="bg-yellow-200 text-xs font-bold px-1.5 py-0.5 rounded">
+                                  {pokemonRatings[pokemon.firebaseId]?.averageRating 
+                                    ? `${pokemonRatings[pokemon.firebaseId].averageRating.toFixed(1)}★` 
+                                    : '0.0★'}
+                                </span>
+                                <span className="bg-yellow-500 text-black px-1.5 py-0.5 rounded text-xs font-bold">
+                                  #{globalRankings[pokemon.firebaseId]}
+                                </span>
+                              </div>
                             ) : (
                               <span className="bg-gray-500 text-white px-1.5 py-0.5 rounded text-xs font-bold">
                                 Unranked
