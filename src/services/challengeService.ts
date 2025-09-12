@@ -15,12 +15,21 @@ import { CLOUDINARY_CONFIG } from '../config/cloudinary';
 export interface ChallengeArt {
   id: string; // Firebase document ID
   name: string;
-  creator: string;
+  creator?: string; // Optional for body-completion challenges
   imageUrl: string;
   types: string[];
   challenge: string; // Challenge type ID (alt-evo, fusions, etc.)
   createdAt: Date;
   updatedAt: Date;
+  // Fusion-specific fields
+  pokemon1Name?: string;
+  pokemon1ImageUrl?: string;
+  pokemon2Name?: string;
+  pokemon2ImageUrl?: string;
+  // Trainer-specific fields
+  trainerType?: 'trainer' | 'gym-leader';
+  // Theme-specific fields
+  themeName?: string;
 }
 
 const COLLECTION_NAME = 'challenge_art';
@@ -63,6 +72,49 @@ export const uploadChallengeImage = async (file: File, artName: string): Promise
     return result.secure_url;
   } catch (error) {
     console.error('Detailed upload error:', error);
+    console.error('Error message:', (error as any)?.message);
+    return null;
+  }
+};
+
+// Upload Pokemon image for fusion challenges
+export const uploadPokemonImage = async (file: File, artName: string, pokemonNumber: number): Promise<string | null> => {
+  try {
+    console.log('Uploading Pokemon image to Cloudinary...');
+    
+    // Create a unique filename
+    const timestamp = Date.now();
+    const sanitizedName = artName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const publicId = `challenges/pokemon/${sanitizedName}-pokemon${pokemonNumber}-${timestamp}`;
+    
+    console.log('Uploading to Cloudinary with public_id:', publicId);
+    
+    // Create form data for Cloudinary upload
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_CONFIG.UPLOAD_PRESET);
+    formData.append('public_id', publicId);
+    formData.append('folder', 'challenges/pokemon');
+    
+    // Upload to Cloudinary
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Cloudinary upload failed: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    console.log('Pokemon image upload successful:', result);
+    
+    return result.secure_url;
+  } catch (error) {
+    console.error('Detailed Pokemon image upload error:', error);
     console.error('Error message:', (error as any)?.message);
     return null;
   }
