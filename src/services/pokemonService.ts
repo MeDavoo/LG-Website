@@ -70,19 +70,28 @@ export const uploadPokemonImage = async (file: File, pokemonName: string): Promi
   }
 };
 
-// Get the next available Pokedex number (always appends to the end since deletion shifts everything down)
+// Get the next available Pokedex number (fills gaps first, then continues sequentially)
 export const getNextPokedexNumber = async (): Promise<number> => {
   try {
-    const q = query(collection(db, COLLECTION_NAME), orderBy('pokedexNumber', 'desc'));
+    const q = query(collection(db, COLLECTION_NAME), orderBy('pokedexNumber'));
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) {
       return 1;
     }
     
-    // Get the highest pokedex number and add 1
-    const highestNumber = querySnapshot.docs[0].data().pokedexNumber;
-    return highestNumber + 1;
+    // Get all existing pokedex numbers
+    const existingNumbers = querySnapshot.docs.map(doc => doc.data().pokedexNumber);
+    
+    // Find the first gap in the sequence (1-151)
+    for (let i = 1; i <= 151; i++) {
+      if (!existingNumbers.includes(i)) {
+        return i;
+      }
+    }
+    
+    // If all slots 1-151 are filled, this shouldn't happen but return 152 as fallback
+    return 152;
   } catch (error) {
     console.error('Error getting next Pokedex number:', error);
     return 1;
@@ -162,18 +171,6 @@ export const deletePokemonImage = async (imageUrl: string): Promise<boolean> => 
   }
 };
 
-// Get a Pokemon by its ID
-export const getPokemonById = async (id: string): Promise<Pokemon | null> => {
-  try {
-    // Get all Pokemon and find the one with matching ID
-    const allPokemon = await getAllPokemon();
-    return allPokemon.find(pokemon => pokemon.id === id) || null;
-  } catch (error) {
-    console.error('Error getting Pokemon by ID:', error);
-    return null;
-  }
-};
-
 // Delete a Pokemon document only
 export const deletePokemon = async (id: string): Promise<boolean> => {
   try {
@@ -185,46 +182,16 @@ export const deletePokemon = async (id: string): Promise<boolean> => {
   }
 };
 
-// Delete a Pokemon and its image, then shift subsequent Pokemon down
+// Delete a Pokemon and its image
 export const deletePokemonWithImage = async (id: string, imageUrl: string): Promise<boolean> => {
   try {
-    // First, get the Pokemon being deleted to know its position
-    const pokemonToDelete = await getPokemonById(id);
-    if (!pokemonToDelete) {
-      console.error('Pokemon not found for deletion');
-      return false;
-    }
-    
-    const deletedPokedexNumber = pokemonToDelete.pokedexNumber;
-    
     // Delete the image from storage first
     if (imageUrl) {
       await deletePokemonImage(imageUrl);
     }
     
-    // Delete the Pokemon document
+    // Then delete the Pokemon document
     await deleteDoc(doc(db, COLLECTION_NAME, id));
-    
-    // Now shift down all Pokemon with higher pokedex numbers
-    const q = query(
-      collection(db, COLLECTION_NAME), 
-      where('pokedexNumber', '>', deletedPokedexNumber),
-      orderBy('pokedexNumber')
-    );
-    const querySnapshot = await getDocs(q);
-    
-    // Update each Pokemon to shift down by 1
-    const updatePromises = querySnapshot.docs.map(doc => {
-      const currentData = doc.data();
-      return updateDoc(doc.ref, {
-        pokedexNumber: currentData.pokedexNumber - 1,
-        updatedAt: new Date()
-      });
-    });
-    
-    await Promise.all(updatePromises);
-    
-    console.log(`Deleted Pokemon #${deletedPokedexNumber} and shifted ${updatePromises.length} Pokemon down`);
     return true;
   } catch (error) {
     console.error('Error deleting Pokemon with image:', error);

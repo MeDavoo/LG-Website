@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllChallengeArt, addChallengeArt, uploadChallengeImage, uploadPokemonImage, updateChallengeArt, deleteChallengeArtWithImage, ChallengeArt } from '../services/challengeService';
+import { getAllChallengeArt, addChallengeArt, uploadChallengeImage, updateChallengeArt, deleteChallengeArtWithImage, ChallengeArt } from '../services/challengeService';
 
 interface ChallengeTab {
   id: string;
@@ -30,18 +30,7 @@ const Challenges = () => {
     creator: '',
     challenge: 'alt-evo',
     types: [] as string[],
-    image: null as File | null,
-    // Fusion specific fields
-    pokemon1Name: '',
-    pokemon1ImageUrl: '',
-    pokemon1Image: null as File | null,
-    pokemon2Name: '',
-    pokemon2ImageUrl: '',
-    pokemon2Image: null as File | null,
-    // Trainer specific fields
-    trainerType: 'trainer' as 'trainer' | 'gym-leader',
-    // Theme specific fields
-    themeName: ''
+    image: null as File | null
   });
 
   // Edit/Delete functionality state
@@ -55,18 +44,7 @@ const Challenges = () => {
     creator: '',
     challenge: 'alt-evo',
     types: [] as string[],
-    image: null as File | null,
-    // Fusion specific fields
-    pokemon1Name: '',
-    pokemon1ImageUrl: '',
-    pokemon1Image: null as File | null,
-    pokemon2Name: '',
-    pokemon2ImageUrl: '',
-    pokemon2Image: null as File | null,
-    // Trainer specific fields
-    trainerType: 'trainer' as 'trainer' | 'gym-leader',
-    // Theme specific fields
-    themeName: ''
+    image: null as File | null
   });
 
   // Notification system
@@ -106,71 +84,11 @@ const Challenges = () => {
     }, 5000);
   };
 
-  // Handle challenge type change
-  const handleChallengeTypeChange = (challengeType: string) => {
-    setAddFormData(prev => ({
-      ...prev,
-      challenge: challengeType,
-      // Reset challenge-specific fields
-      pokemon1Name: '',
-      pokemon1ImageUrl: '',
-      pokemon1Image: null,
-      pokemon2Name: '',
-      pokemon2ImageUrl: '',
-      pokemon2Image: null,
-      trainerType: 'trainer',
-      themeName: '',
-      // For body-completion, clear creator
-      creator: challengeType === 'body-completion' ? '' : prev.creator,
-      // Reset types for trainers (will be handled differently)
-      types: challengeType === 'trainers' ? [] : prev.types
-    }));
-  };
-
   // Handle adding new challenge art
   const handleAddChallengeArt = async () => {
-    // Validation based on challenge type
-    if (!addFormData.name || !addFormData.image) {
+    if (!addFormData.name || !addFormData.creator || addFormData.types.length === 0 || !addFormData.image) {
       showNotification('Please fill in all required fields and select an image', 'error');
       return;
-    }
-
-    // Challenge-specific validation
-    if (addFormData.challenge !== 'body-completion' && !addFormData.creator) {
-      showNotification('Please select a creator', 'error');
-      return;
-    }
-
-    if (addFormData.challenge === 'fusions') {
-      if (!addFormData.pokemon1Image || !addFormData.pokemon2Image || !addFormData.pokemon1Name || !addFormData.pokemon2Name) {
-        showNotification('Please provide names and images for both Pokemon in the fusion', 'error');
-        return;
-      }
-    }
-
-    if (addFormData.challenge === 'themes') {
-      if (!addFormData.themeName) {
-        showNotification('Please provide theme name', 'error');
-        return;
-      }
-    }
-
-    // Trainer type validation
-    if (addFormData.challenge === 'trainers') {
-      if (addFormData.trainerType === 'trainer' && addFormData.types.length > 0) {
-        showNotification('Regular trainers should not have specific types', 'error');
-        return;
-      }
-      if (addFormData.trainerType === 'gym-leader' && addFormData.types.length !== 1) {
-        showNotification('Gym leaders must have exactly one type selected', 'error');
-        return;
-      }
-    } else {
-      // For non-trainer and non-fusion challenges, require at least one type
-      if (addFormData.challenge !== 'fusions' && addFormData.types.length === 0) {
-        showNotification('Please select at least one Pokemon type', 'error');
-        return;
-      }
     }
 
     setIsUploading(true);
@@ -183,51 +101,13 @@ const Challenges = () => {
       }
 
       // Add challenge art to database
-      const challengeArtData: any = {
+      const challengeArtData = {
         name: addFormData.name,
+        creator: addFormData.creator,
         challenge: addFormData.challenge,
         types: addFormData.types,
         imageUrl
       };
-
-      // Add creator if not body-completion
-      if (addFormData.challenge !== 'body-completion') {
-        challengeArtData.creator = addFormData.creator;
-      }
-
-      // Add challenge-specific fields
-      if (addFormData.challenge === 'fusions') {
-        // Add Pokemon names
-        challengeArtData.pokemon1Name = addFormData.pokemon1Name;
-        challengeArtData.pokemon2Name = addFormData.pokemon2Name;
-        
-        // Upload Pokemon images
-        if (addFormData.pokemon1Image) {
-          const pokemon1ImageUrl = await uploadPokemonImage(addFormData.pokemon1Image, addFormData.name, 1);
-          if (!pokemon1ImageUrl) {
-            showNotification('❌ Error uploading Pokemon 1 image. Please try again.', 'error');
-            return;
-          }
-          challengeArtData.pokemon1ImageUrl = pokemon1ImageUrl;
-        }
-        
-        if (addFormData.pokemon2Image) {
-          const pokemon2ImageUrl = await uploadPokemonImage(addFormData.pokemon2Image, addFormData.name, 2);
-          if (!pokemon2ImageUrl) {
-            showNotification('❌ Error uploading Pokemon 2 image. Please try again.', 'error');
-            return;
-          }
-          challengeArtData.pokemon2ImageUrl = pokemon2ImageUrl;
-        }
-      }
-
-      if (addFormData.challenge === 'trainers') {
-        challengeArtData.trainerType = addFormData.trainerType;
-      }
-
-      if (addFormData.challenge === 'themes') {
-        challengeArtData.themeName = addFormData.themeName;
-      }
 
       const success = await addChallengeArt(challengeArtData);
       if (success) {
@@ -240,15 +120,7 @@ const Challenges = () => {
           creator: '',
           challenge: 'alt-evo',
           types: [],
-          image: null,
-          pokemon1Name: '',
-          pokemon1ImageUrl: '',
-          pokemon1Image: null,
-          pokemon2Name: '',
-          pokemon2ImageUrl: '',
-          pokemon2Image: null,
-          trainerType: 'trainer',
-          themeName: ''
+          image: null
         });
         
         await loadChallengeData(); // Refresh the data
@@ -268,22 +140,10 @@ const Challenges = () => {
     setAddFormData(prev => {
       if (prev.types.includes(type)) {
         return { ...prev, types: prev.types.filter(t => t !== type) };
+      } else if (prev.types.length < 2) {
+        return { ...prev, types: [...prev.types, type] };
       } else {
-        // For gym leaders, only allow 1 type
-        if (prev.challenge === 'trainers' && prev.trainerType === 'gym-leader') {
-          if (prev.types.length < 1) {
-            return { ...prev, types: [type] };
-          } else {
-            return prev; // Maximum 1 type for gym leaders
-          }
-        } else {
-          // For other challenges, allow up to 2 types
-          if (prev.types.length < 2) {
-            return { ...prev, types: [...prev.types, type] };
-          } else {
-            return prev; // Maximum 2 types
-          }
-        }
+        return prev; // Maximum 2 types
       }
     });
   };
@@ -329,18 +189,10 @@ const Challenges = () => {
     
     setEditFormData({
       name: selectedArt.name,
-      creator: selectedArt.creator || '',
+      creator: selectedArt.creator,
       challenge: selectedArt.challenge,
       types: [...selectedArt.types],
-      image: null,
-      pokemon1Name: selectedArt.pokemon1Name || '',
-      pokemon1ImageUrl: selectedArt.pokemon1ImageUrl || '',
-      pokemon1Image: null,
-      pokemon2Name: selectedArt.pokemon2Name || '',
-      pokemon2ImageUrl: selectedArt.pokemon2ImageUrl || '',
-      pokemon2Image: null,
-      trainerType: selectedArt.trainerType || 'trainer',
-      themeName: selectedArt.themeName || ''
+      image: null
     });
     setShowEditForm(true);
     setShowActionsDropdown(false);
@@ -348,48 +200,9 @@ const Challenges = () => {
 
   // Handle updating challenge art
   const handleUpdateChallengeArt = async () => {
-    // Validation based on challenge type
-    if (!selectedArt || !editFormData.name) {
+    if (!selectedArt || !editFormData.name || !editFormData.creator || editFormData.types.length === 0) {
       showNotification('Please fill in all required fields', 'error');
       return;
-    }
-
-    // Challenge-specific validation
-    if (editFormData.challenge !== 'body-completion' && !editFormData.creator) {
-      showNotification('Please select a creator', 'error');
-      return;
-    }
-
-    if (editFormData.challenge === 'fusions') {
-      if ((!editFormData.pokemon1Image && !editFormData.pokemon1ImageUrl) || (!editFormData.pokemon2Image && !editFormData.pokemon2ImageUrl) || !editFormData.pokemon1Name || !editFormData.pokemon2Name) {
-        showNotification('Please provide names and images for both Pokemon in the fusion', 'error');
-        return;
-      }
-    }
-
-    if (editFormData.challenge === 'themes') {
-      if (!editFormData.themeName) {
-        showNotification('Please provide theme name', 'error');
-        return;
-      }
-    }
-
-    // Trainer type validation
-    if (editFormData.challenge === 'trainers') {
-      if (editFormData.trainerType === 'trainer' && editFormData.types.length > 0) {
-        showNotification('Regular trainers should not have specific types', 'error');
-        return;
-      }
-      if (editFormData.trainerType === 'gym-leader' && editFormData.types.length !== 1) {
-        showNotification('Gym leaders must have exactly one type selected', 'error');
-        return;
-      }
-    } else {
-      // For non-trainer and non-fusion challenges, require at least one type
-      if (editFormData.challenge !== 'fusions' && editFormData.types.length === 0) {
-        showNotification('Please select at least one Pokemon type', 'error');
-        return;
-      }
     }
 
     setIsUpdating(true);
@@ -407,57 +220,13 @@ const Challenges = () => {
       }
 
       // Update challenge art in database
-      const challengeArtData: any = {
+      const success = await updateChallengeArt(selectedArt.id, {
         name: editFormData.name,
+        creator: editFormData.creator,
         challenge: editFormData.challenge,
         types: editFormData.types,
         imageUrl
-      };
-
-      // Add creator if not body-completion
-      if (editFormData.challenge !== 'body-completion') {
-        challengeArtData.creator = editFormData.creator;
-      }
-
-      // Add challenge-specific fields
-      if (editFormData.challenge === 'fusions') {
-        // Add Pokemon names
-        challengeArtData.pokemon1Name = editFormData.pokemon1Name;
-        challengeArtData.pokemon2Name = editFormData.pokemon2Name;
-        
-        // Use existing URLs as default
-        challengeArtData.pokemon1ImageUrl = editFormData.pokemon1ImageUrl;
-        challengeArtData.pokemon2ImageUrl = editFormData.pokemon2ImageUrl;
-        
-        // Upload new Pokemon images if provided
-        if (editFormData.pokemon1Image) {
-          const pokemon1ImageUrl = await uploadPokemonImage(editFormData.pokemon1Image, editFormData.name, 1);
-          if (!pokemon1ImageUrl) {
-            showNotification('❌ Error uploading Pokemon 1 image. Please try again.', 'error');
-            return;
-          }
-          challengeArtData.pokemon1ImageUrl = pokemon1ImageUrl;
-        }
-        
-        if (editFormData.pokemon2Image) {
-          const pokemon2ImageUrl = await uploadPokemonImage(editFormData.pokemon2Image, editFormData.name, 2);
-          if (!pokemon2ImageUrl) {
-            showNotification('❌ Error uploading Pokemon 2 image. Please try again.', 'error');
-            return;
-          }
-          challengeArtData.pokemon2ImageUrl = pokemon2ImageUrl;
-        }
-      }
-
-      if (editFormData.challenge === 'trainers') {
-        challengeArtData.trainerType = editFormData.trainerType;
-      }
-
-      if (editFormData.challenge === 'themes') {
-        challengeArtData.themeName = editFormData.themeName;
-      }
-
-      const success = await updateChallengeArt(selectedArt.id, challengeArtData);
+      });
 
       if (success) {
         showNotification(`✅ ${editFormData.name} has been updated successfully!`, 'success');
@@ -503,22 +272,10 @@ const Challenges = () => {
     setEditFormData(prev => {
       if (prev.types.includes(type)) {
         return { ...prev, types: prev.types.filter(t => t !== type) };
+      } else if (prev.types.length < 2) {
+        return { ...prev, types: [...prev.types, type] };
       } else {
-        // For gym leaders, only allow 1 type
-        if (prev.challenge === 'trainers' && prev.trainerType === 'gym-leader') {
-          if (prev.types.length < 1) {
-            return { ...prev, types: [type] };
-          } else {
-            return prev; // Maximum 1 type for gym leaders
-          }
-        } else {
-          // For other challenges, allow up to 2 types
-          if (prev.types.length < 2) {
-            return { ...prev, types: [...prev.types, type] };
-          } else {
-            return prev; // Maximum 2 types
-          }
-        }
+        return prev; // Maximum 2 types
       }
     });
   };
@@ -641,7 +398,7 @@ const Challenges = () => {
           <div className="grid grid-cols-12 gap-4">
             
             {/* Left Panel - Art List */}
-            <div className="col-span-6 space-y-2 custom-scrollbar animate-slide-in-left">
+            <div className="col-span-8 space-y-2 custom-scrollbar animate-slide-in-left">
               <div className="text-center mb-4">
                 <div className="flex items-center justify-center gap-3">
                   <h2 className="text-white font-bold text-xl">
@@ -661,27 +418,27 @@ const Challenges = () => {
                     <p className="text-white/60">No artwork has been created for this challenge yet</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     {filteredArt.map((art) => (
                       <div
                         key={art.id}
                         onClick={() => setSelectedArt(art)}
-                        className={`group cursor-pointer bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-3 hover:bg-white/20 transition-all duration-300 ${
+                        className={`group cursor-pointer bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2 hover:bg-white/20 transition-all duration-300 ${
                           selectedArt?.id === art.id ? 'ring-2 ring-yellow-400 bg-white/20' : ''
                         }`}
                       >
                         {/* Smaller Art Image */}
-                        <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-white/5">
+                        <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-white/5">
                           <img
                             src={art.imageUrl}
                             alt={art.name}
-                            className={`w-full h-full ${art.challenge === 'trainers' ? 'object-cover object-top' : 'object-cover'} group-hover:scale-105 transition-transform duration-300`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         </div>
                         
                         {/* Art Info */}
-                        <div className="space-y-2">
-                          <h3 className="text-white font-bold text-base group-hover:text-yellow-300 transition-colors">
+                        <div className="space-y-1">
+                          <h3 className="text-white font-bold text-sm group-hover:text-yellow-300 transition-colors">
                             {art.name}
                           </h3>
                           
@@ -697,52 +454,11 @@ const Challenges = () => {
                             ))}
                           </div>
                           
-                          {/* Challenge-specific info */}
-                          {art.challenge === 'trainers' && art.trainerType && (
-                            <div className="px-2 py-1 bg-gray-500/30 rounded-full text-white text-xs font-medium text-center">
-                              {art.trainerType === 'gym-leader' ? 'Gym Leader' : 'Trainer'}
-                            </div>
-                          )}
-                          
-                          {art.challenge === 'themes' && art.themeName && (
-                            <div className="px-2 py-1 bg-gray-500/30 rounded-full text-white text-xs font-medium text-center">
-                              {art.themeName}
-                            </div>
-                          )}
-                          
-                          {art.challenge === 'fusions' && (art.pokemon1ImageUrl || art.pokemon2ImageUrl) && (
-                            <div className="flex items-center gap-1">
-                              {art.pokemon1ImageUrl && (
-                                <div className="flex flex-col items-center gap-1">
-                                  <img src={art.pokemon1ImageUrl} alt={art.pokemon1Name || "Pokemon 1"} className="w-8 h-8 rounded object-cover" />
-                                  {art.pokemon1Name && (
-                                    <div className="px-2 py-0.5 bg-gray-500/30 rounded-full text-white text-xs font-medium">
-                                      {art.pokemon1Name}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                              <span className="text-yellow-400 text-sm">+</span>
-                              {art.pokemon2ImageUrl && (
-                                <div className="flex flex-col items-center gap-1">
-                                  <img src={art.pokemon2ImageUrl} alt={art.pokemon2Name || "Pokemon 2"} className="w-8 h-8 rounded object-cover" />
-                                  {art.pokemon2Name && (
-                                    <div className="px-2 py-0.5 bg-gray-500/30 rounded-full text-white text-xs font-medium">
-                                      {art.pokemon2Name}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Creator - only show if exists */}
-                          {art.creator && (
-                            <div className="flex items-center text-white/70 text-xs">
-                              <span className="font-semibold">By:</span>
-                              <span className="ml-1 text-yellow-300">{art.creator}</span>
-                            </div>
-                          )}
+                          {/* Creator */}
+                          <div className="flex items-center text-white/70 text-xs">
+                            <span className="font-semibold">By:</span>
+                            <span className="ml-1 text-yellow-300">{art.creator}</span>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -756,13 +472,14 @@ const Challenges = () => {
                   onClick={() => setShowAddForm(true)}
                   className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold flex items-center space-x-2 mx-auto"
                 >
+                  <span className="text-xl">🎨</span>
                   <span>Add New Art</span>
                 </button>
               </div>
             </div>
             
             {/* Right Panel - Art Detail */}
-            <div className="col-span-6 space-y-2 custom-scrollbar animate-slide-in-right">
+            <div className="col-span-4 space-y-2 custom-scrollbar animate-slide-in-right">
               <div className="text-center mb-4">
                 <h2 className="text-white font-bold text-xl">Art Details</h2>
               </div>
@@ -771,7 +488,7 @@ const Challenges = () => {
                 {selectedArt ? (
                   <div className="space-y-4">
                     {/* Art Image */}
-                    <div className="w-full rounded-lg overflow-hidden bg-white/5" style={{aspectRatio: '1/1', maxHeight: '500px'}}>
+                    <div className="w-full rounded-lg overflow-hidden bg-white/5" style={{aspectRatio: '1/1', maxHeight: '300px'}}>
                       <img
                         src={selectedArt.imageUrl}
                         alt={selectedArt.name}
@@ -788,123 +505,28 @@ const Challenges = () => {
                         </p>
                       </div>
                       
-                      {/* Types - Only show if there are types and not fusion or regular trainer */}
-                      {selectedArt.types.length > 0 && 
-                       selectedArt.challenge !== 'fusions' && 
-                       !(selectedArt.challenge === 'trainers' && selectedArt.trainerType === 'trainer') && (
-                        <div>
-                          <h3 className="text-white font-semibold mb-2">Types</h3>
-                          <div className="flex flex-wrap gap-2">
-                            {selectedArt.types.map((type: string) => (
-                              <span
-                                key={type}
-                                className={`px-3 py-1 rounded-lg text-sm font-semibold text-white ${getTypeColor(type)}`}
-                              >
-                                {type}
-                              </span>
-                            ))}
-                          </div>
+                      {/* Types */}
+                      <div>
+                        <h3 className="text-white font-semibold mb-2">Types</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedArt.types.map((type: string) => (
+                            <span
+                              key={type}
+                              className={`px-3 py-1 rounded-lg text-sm font-semibold text-white ${getTypeColor(type)}`}
+                            >
+                              {type}
+                            </span>
+                          ))}
                         </div>
-                      )}
+                      </div>
                       
-                      {/* Creator - Only show if exists (not for body-completion) */}
-                      {selectedArt.creator && (
-                        <div>
-                          <h3 className="text-white font-semibold mb-2">Creator</h3>
-                          <div className="bg-white/10 rounded-lg p-3">
-                            <span className="text-yellow-300 font-bold text-lg">{selectedArt.creator}</span>
-                          </div>
+                      {/* Creator */}
+                      <div>
+                        <h3 className="text-white font-semibold mb-2">Creator</h3>
+                        <div className="bg-white/10 rounded-lg p-3">
+                          <span className="text-yellow-300 font-bold text-lg">{selectedArt.creator}</span>
                         </div>
-                      )}
-
-                      {/* Challenge-specific information */}
-                      {selectedArt.challenge === 'fusions' && (selectedArt.pokemon1ImageUrl || selectedArt.pokemon2ImageUrl) && (
-                        <div>
-                          <h3 className="text-white font-semibold mb-2">Fusion Details</h3>
-                          <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-                            <div className="flex items-center justify-center gap-6">
-                              {/* Pokemon 1 */}
-                              <div className="flex flex-col items-center space-y-2">
-                                {selectedArt.pokemon1ImageUrl && (
-                                  <div className="w-32 h-32 rounded-lg overflow-hidden bg-white/10">
-                                    <img 
-                                      src={selectedArt.pokemon1ImageUrl} 
-                                      alt={selectedArt.pokemon1Name || "Pokemon 1"}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                )}
-                                <div className="text-white text-sm font-medium">
-                                  {selectedArt.pokemon1Name || "Pokemon 1"}
-                                </div>
-                              </div>
-
-                              {/* Fusion Arrow */}
-                              <div className="flex flex-col items-center">
-                                <div className="text-yellow-400 text-3xl font-bold">+</div>
-                                <div className="text-white/60 text-xs">FUSION</div>
-                              </div>
-
-                              {/* Pokemon 2 */}
-                              <div className="flex flex-col items-center space-y-2">
-                                {selectedArt.pokemon2ImageUrl && (
-                                  <div className="w-32 h-32 rounded-lg overflow-hidden bg-white/10">
-                                    <img 
-                                      src={selectedArt.pokemon2ImageUrl} 
-                                      alt={selectedArt.pokemon2Name || "Pokemon 2"}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                )}
-                                <div className="text-white text-sm font-medium">
-                                  {selectedArt.pokemon2Name || "Pokemon 2"}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Trainer Type */}
-                      {selectedArt.challenge === 'trainers' && selectedArt.trainerType && (
-                        <div>
-                          <h3 className="text-white font-semibold mb-2">Trainer Type</h3>
-                          <div className="bg-white/10 rounded-lg p-3">
-                            <div className="flex items-center gap-2">
-                              <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${
-                                selectedArt.trainerType === 'gym-leader' 
-                                  ? 'bg-purple-500 text-white' 
-                                  : 'bg-blue-500 text-white'
-                              }`}>
-                                {selectedArt.trainerType === 'gym-leader' ? 'Gym Leader' : 'Trainer'}
-                              </span>
-                              {/* Show type for gym leaders */}
-                              {selectedArt.trainerType === 'gym-leader' && selectedArt.types.length > 0 && (
-                                <span className={`px-2 py-1 rounded text-xs font-semibold text-white ${getTypeColor(selectedArt.types[0])}`}>
-                                  {selectedArt.types[0]}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Theme Details */}
-                      {selectedArt.challenge === 'themes' && selectedArt.themeName && (
-                        <div>
-                          <h3 className="text-white font-semibold mb-2">Theme Details</h3>
-                          <div className="bg-white/5 p-3 rounded-lg border border-white/10 space-y-2">
-                            <div>
-                              <span className="text-white/70 text-sm">Pokemon:</span>
-                              <span className="text-yellow-300 font-medium ml-2">{selectedArt.name}</span>
-                            </div>
-                            <div>
-                              <span className="text-white/70 text-sm">Theme:</span>
-                              <span className="text-blue-300 font-medium ml-2">{selectedArt.themeName}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      </div>
                       
                       {/* Creation Date */}
                       <div>
@@ -1034,6 +656,26 @@ const Challenges = () => {
                 />
               </div>
 
+              {/* Creator Selection */}
+              <div>
+                <label className="block text-white font-semibold mb-2">Creator *</label>
+                <div className="flex gap-2">
+                  {['DAVE', 'JOAO', 'GUTO'].map((creator) => (
+                    <button
+                      key={creator}
+                      onClick={() => setAddFormData(prev => ({ ...prev, creator }))}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                        addFormData.creator === creator
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-white/20 text-white/80 hover:bg-white/30'
+                      }`}
+                    >
+                      {creator}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Challenge Type Selection */}
               <div>
                 <label className="block text-white font-semibold mb-2">Challenge Type *</label>
@@ -1041,7 +683,7 @@ const Challenges = () => {
                   {CHALLENGE_TABS.map((tab) => (
                     <button
                       key={tab.id}
-                      onClick={() => handleChallengeTypeChange(tab.id)}
+                      onClick={() => setAddFormData(prev => ({ ...prev, challenge: tab.id }))}
                       className={`px-3 py-2 rounded-lg font-semibold transition-all text-sm ${
                         addFormData.challenge === tab.id
                           ? 'bg-yellow-400 text-black'
@@ -1054,164 +696,6 @@ const Challenges = () => {
                   ))}
                 </div>
               </div>
-
-              {/* Creator Selection - Hidden for body-completion */}
-              {addFormData.challenge !== 'body-completion' && (
-                <div>
-                  <label className="block text-white font-semibold mb-2">Creator *</label>
-                  <div className="flex gap-2">
-                    {['DAVE', 'JOAO', 'GUTO'].map((creator) => (
-                      <button
-                        key={creator}
-                        onClick={() => setAddFormData(prev => ({ ...prev, creator }))}
-                        className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                          addFormData.creator === creator
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-white/20 text-white/80 hover:bg-white/30'
-                        }`}
-                      >
-                        {creator}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Challenge-specific fields */}
-              {addFormData.challenge === 'fusions' && (
-                <div className="space-y-4">
-                  <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-                    <h3 className="text-white font-semibold mb-3">Fusion Details</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                      {/* Pokemon 1 */}
-                      <div className="space-y-3">
-                        <label className="block text-white/80 text-sm font-medium mb-2">Pokemon 1 *</label>
-                        <input
-                          type="text"
-                          value={addFormData.pokemon1Name}
-                          onChange={(e) => setAddFormData(prev => ({ ...prev, pokemon1Name: e.target.value }))}
-                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                          placeholder="Pokemon 1 name"
-                        />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              if (file.size > 5 * 1024 * 1024) {
-                                showNotification('File size too large. Please select an image under 5MB.', 'error');
-                                return;
-                              }
-                              if (!file.type.startsWith('image/')) {
-                                showNotification('Please select a valid image file.', 'error');
-                                return;
-                              }
-                              setAddFormData(prev => ({ ...prev, pokemon1Image: file }));
-                            }
-                          }}
-                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
-                        />
-                        {addFormData.pokemon1Image && (
-                          <div className="mt-2 text-sm text-green-400">
-                            ✅ {addFormData.pokemon1Image.name}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Fusion Arrow */}
-                      <div className="text-center">
-                        <div className="text-yellow-400 text-2xl font-bold">→</div>
-                        <div className="text-white/60 text-sm">FUSION</div>
-                        <div className="text-yellow-400 text-2xl font-bold">←</div>
-                      </div>
-
-                      {/* Pokemon 2 */}
-                      <div className="space-y-3">
-                        <label className="block text-white/80 text-sm font-medium mb-2">Pokemon 2 *</label>
-                        <input
-                          type="text"
-                          value={addFormData.pokemon2Name}
-                          onChange={(e) => setAddFormData(prev => ({ ...prev, pokemon2Name: e.target.value }))}
-                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                          placeholder="Pokemon 2 name"
-                        />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              if (file.size > 5 * 1024 * 1024) {
-                                showNotification('File size too large. Please select an image under 5MB.', 'error');
-                                return;
-                              }
-                              if (!file.type.startsWith('image/')) {
-                                showNotification('Please select a valid image file.', 'error');
-                                return;
-                              }
-                              setAddFormData(prev => ({ ...prev, pokemon2Image: file }));
-                            }
-                          }}
-                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
-                        />
-                        {addFormData.pokemon2Image && (
-                          <div className="mt-2 text-sm text-green-400">
-                            ✅ {addFormData.pokemon2Image.name}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Trainer Type - Only for trainers challenge */}
-              {addFormData.challenge === 'trainers' && (
-                <div>
-                  <label className="block text-white font-semibold mb-2">Type *</label>
-                  <div className="flex gap-2">
-                    {[
-                      { value: 'trainer', label: 'Trainer' },
-                      { value: 'gym-leader', label: 'Gym Leader' }
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => setAddFormData(prev => ({ ...prev, trainerType: option.value as 'trainer' | 'gym-leader' }))}
-                        className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                          addFormData.trainerType === option.value
-                            ? 'bg-purple-500 text-white'
-                            : 'bg-white/20 text-white/80 hover:bg-white/30'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Theme Fields - Only for themes challenge */}
-              {addFormData.challenge === 'themes' && (
-                <div className="space-y-4">
-                  <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-                    <h3 className="text-white font-semibold mb-3">Theme Details</h3>
-                    <div className="grid grid-cols-1 gap-4">
-                      {/* Theme Name */}
-                      <div>
-                        <label className="block text-white/80 text-sm font-medium mb-2">Theme Name *</label>
-                        <input
-                          type="text"
-                          value={addFormData.themeName}
-                          onChange={(e) => setAddFormData(prev => ({ ...prev, themeName: e.target.value }))}
-                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                          placeholder="e.g., Halloween, Christmas, Cyberpunk"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Image Upload */}
               <div onPaste={handleAddImagePaste} tabIndex={0} className="outline-none">
@@ -1234,49 +718,35 @@ const Challenges = () => {
                 </p>
               </div>
 
-              {/* Types Selection - Show for most challenges except trainers and fusions (unless gym leader) */}
-              {((addFormData.challenge !== 'trainers' && addFormData.challenge !== 'fusions') || (addFormData.challenge === 'trainers' && addFormData.trainerType === 'gym-leader')) && (
-                <div>
-                  <label className="block text-white font-semibold mb-2">
-                    Pokemon Types * 
-                    {addFormData.challenge === 'trainers' && addFormData.trainerType === 'gym-leader' 
-                      ? ' (Select gym type - 1 only)' 
-                      : ' (Select 1-2)'
-                    }
-                  </label>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
-                    {[
-                      'Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice',
-                      'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug',
-                      'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy'
-                    ].map((type) => (
-                      <button
-                        key={type}
-                        onClick={() => handleAddTypeToggle(type)}
-                        disabled={
-                          !addFormData.types.includes(type) && 
-                          ((addFormData.challenge === 'trainers' && addFormData.trainerType === 'gym-leader' && addFormData.types.length >= 1) ||
-                           (addFormData.challenge !== 'trainers' && addFormData.types.length >= 2))
-                        }
-                        className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                          addFormData.types.includes(type)
-                            ? 'bg-yellow-400 text-black'
-                            : !addFormData.types.includes(type) && 
-                              ((addFormData.challenge === 'trainers' && addFormData.trainerType === 'gym-leader' && addFormData.types.length >= 1) ||
-                               (addFormData.challenge !== 'trainers' && addFormData.types.length >= 2))
-                            ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                            : 'bg-white/20 text-white/80 hover:bg-white/30'
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-white/60 text-sm mt-2">
-                    Selected: {addFormData.types.join(', ') || 'None'}
-                  </p>
+              {/* Types Selection */}
+              <div>
+                <label className="block text-white font-semibold mb-2">Pokemon Types * (Select 1-2)</label>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
+                  {[
+                    'Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice',
+                    'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug',
+                    'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy'
+                  ].map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => handleAddTypeToggle(type)}
+                      disabled={!addFormData.types.includes(type) && addFormData.types.length >= 2}
+                      className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                        addFormData.types.includes(type)
+                          ? 'bg-yellow-400 text-black'
+                          : !addFormData.types.includes(type) && addFormData.types.length >= 2
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-white/20 text-white/80 hover:bg-white/30'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
                 </div>
-              )}
+                <p className="text-white/60 text-sm mt-2">
+                  Selected: {addFormData.types.join(', ') || 'None'}
+                </p>
+              </div>
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
@@ -1288,17 +758,7 @@ const Challenges = () => {
                 </button>
                 <button
                   onClick={handleAddChallengeArt}
-                  disabled={
-                    isUploading || 
-                    !addFormData.name || 
-                    !addFormData.image ||
-                    (addFormData.challenge !== 'body-completion' && !addFormData.creator) ||
-                    (addFormData.challenge === 'fusions' && (!addFormData.pokemon1Image || !addFormData.pokemon2Image || !addFormData.pokemon1Name || !addFormData.pokemon2Name)) ||
-                    (addFormData.challenge === 'themes' && !addFormData.themeName) ||
-                    (addFormData.challenge === 'trainers' && addFormData.trainerType === 'trainer' && addFormData.types.length > 0) ||
-                    (addFormData.challenge === 'trainers' && addFormData.trainerType === 'gym-leader' && addFormData.types.length !== 1) ||
-                    (addFormData.challenge !== 'trainers' && addFormData.challenge !== 'fusions' && addFormData.types.length === 0)
-                  }
+                  disabled={isUploading || !addFormData.name || !addFormData.creator || addFormData.types.length === 0 || !addFormData.image}
                   className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold disabled:bg-green-400 disabled:cursor-not-allowed"
                 >
                   {isUploading ? 'Adding...' : 'Add Challenge Art'}
@@ -1336,6 +796,26 @@ const Challenges = () => {
                 />
               </div>
 
+              {/* Creator Selection */}
+              <div>
+                <label className="block text-white font-semibold mb-2">Creator *</label>
+                <div className="flex gap-2">
+                  {['DAVE', 'JOAO', 'GUTO'].map((creator) => (
+                    <button
+                      key={creator}
+                      onClick={() => setEditFormData(prev => ({ ...prev, creator }))}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                        editFormData.creator === creator
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-white/20 text-white/80 hover:bg-white/30'
+                      }`}
+                    >
+                      {creator}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Challenge Type Selection */}
               <div>
                 <label className="block text-white font-semibold mb-2">Challenge Type *</label>
@@ -1343,17 +823,7 @@ const Challenges = () => {
                   {CHALLENGE_TABS.map((tab) => (
                     <button
                       key={tab.id}
-                      onClick={() => setEditFormData(prev => ({ 
-                        ...prev, 
-                        challenge: tab.id,
-                        // Reset challenge-specific fields when changing type
-                        pokemon1Name: '',
-                        pokemon1ImageUrl: '',
-                        pokemon2Name: '',
-                        pokemon2ImageUrl: '',
-                        trainerType: 'trainer',
-                        creator: tab.id === 'body-completion' ? '' : prev.creator
-                      }))}
+                      onClick={() => setEditFormData(prev => ({ ...prev, challenge: tab.id }))}
                       className={`px-3 py-2 rounded-lg font-semibold transition-all text-sm ${
                         editFormData.challenge === tab.id
                           ? 'bg-yellow-400 text-black'
@@ -1366,176 +836,6 @@ const Challenges = () => {
                   ))}
                 </div>
               </div>
-
-              {/* Creator Selection - Hidden for body-completion */}
-              {editFormData.challenge !== 'body-completion' && (
-                <div>
-                  <label className="block text-white font-semibold mb-2">Creator *</label>
-                  <div className="flex gap-2">
-                    {['DAVE', 'JOAO', 'GUTO'].map((creator) => (
-                      <button
-                        key={creator}
-                        onClick={() => setEditFormData(prev => ({ ...prev, creator }))}
-                        className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                          editFormData.creator === creator
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-white/20 text-white/80 hover:bg-white/30'
-                        }`}
-                      >
-                        {creator}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Challenge-specific fields */}
-              {editFormData.challenge === 'fusions' && (
-                <div className="space-y-4">
-                  <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-                    <h3 className="text-white font-semibold mb-3">Fusion Details</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                      {/* Pokemon 1 */}
-                      <div className="space-y-3">
-                        <label className="block text-white/80 text-sm font-medium mb-2">Pokemon 1 *</label>
-                        <input
-                          type="text"
-                          value={editFormData.pokemon1Name}
-                          onChange={(e) => setEditFormData(prev => ({ ...prev, pokemon1Name: e.target.value }))}
-                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                          placeholder="Pokemon 1 name"
-                        />
-                        {editFormData.pokemon1ImageUrl && (
-                          <div className="mb-2">
-                            <img src={editFormData.pokemon1ImageUrl} alt="Current Pokemon 1" className="w-20 h-20 object-cover rounded-lg border border-white/20" />
-                            <p className="text-xs text-white/60 mt-1">Current image</p>
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              if (file.size > 5 * 1024 * 1024) {
-                                showNotification('File size too large. Please select an image under 5MB.', 'error');
-                                return;
-                              }
-                              if (!file.type.startsWith('image/')) {
-                                showNotification('Please select a valid image file.', 'error');
-                                return;
-                              }
-                              setEditFormData(prev => ({ ...prev, pokemon1Image: file }));
-                            }
-                          }}
-                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
-                        />
-                        {editFormData.pokemon1Image && (
-                          <div className="mt-2 text-sm text-green-400">
-                            ✅ New: {editFormData.pokemon1Image.name}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Fusion Arrow */}
-                      <div className="text-center">
-                        <div className="text-yellow-400 text-2xl font-bold">→</div>
-                        <div className="text-white/60 text-sm">FUSION</div>
-                        <div className="text-yellow-400 text-2xl font-bold">←</div>
-                      </div>
-
-                      {/* Pokemon 2 */}
-                      <div className="space-y-3">
-                        <label className="block text-white/80 text-sm font-medium mb-2">Pokemon 2 *</label>
-                        <input
-                          type="text"
-                          value={editFormData.pokemon2Name}
-                          onChange={(e) => setEditFormData(prev => ({ ...prev, pokemon2Name: e.target.value }))}
-                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                          placeholder="Pokemon 2 name"
-                        />
-                        {editFormData.pokemon2ImageUrl && (
-                          <div className="mb-2">
-                            <img src={editFormData.pokemon2ImageUrl} alt="Current Pokemon 2" className="w-20 h-20 object-cover rounded-lg border border-white/20" />
-                            <p className="text-xs text-white/60 mt-1">Current image</p>
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              if (file.size > 5 * 1024 * 1024) {
-                                showNotification('File size too large. Please select an image under 5MB.', 'error');
-                                return;
-                              }
-                              if (!file.type.startsWith('image/')) {
-                                showNotification('Please select a valid image file.', 'error');
-                                return;
-                              }
-                              setEditFormData(prev => ({ ...prev, pokemon2Image: file }));
-                            }
-                          }}
-                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
-                        />
-                        {editFormData.pokemon2Image && (
-                          <div className="mt-2 text-sm text-green-400">
-                            ✅ New: {editFormData.pokemon2Image.name}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Trainer Type - Only for trainers challenge */}
-              {editFormData.challenge === 'trainers' && (
-                <div>
-                  <label className="block text-white font-semibold mb-2">Type *</label>
-                  <div className="flex gap-2">
-                    {[
-                      { value: 'trainer', label: 'Trainer' },
-                      { value: 'gym-leader', label: 'Gym Leader' }
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => setEditFormData(prev => ({ ...prev, trainerType: option.value as 'trainer' | 'gym-leader' }))}
-                        className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                          editFormData.trainerType === option.value
-                            ? 'bg-purple-500 text-white'
-                            : 'bg-white/20 text-white/80 hover:bg-white/30'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Theme Fields - Only for themes challenge */}
-              {editFormData.challenge === 'themes' && (
-                <div className="space-y-4">
-                  <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-                    <h3 className="text-white font-semibold mb-3">Theme Details</h3>
-                    <div className="grid grid-cols-1 gap-4">
-                      {/* Theme Name */}
-                      <div>
-                        <label className="block text-white/80 text-sm font-medium mb-2">Theme Name *</label>
-                        <input
-                          type="text"
-                          value={editFormData.themeName}
-                          onChange={(e) => setEditFormData(prev => ({ ...prev, themeName: e.target.value }))}
-                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                          placeholder="e.g., Halloween, Christmas, Cyberpunk"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Image Upload */}
               <div onPaste={handleEditImagePaste} tabIndex={0} className="outline-none">
@@ -1560,49 +860,35 @@ const Challenges = () => {
                 )}
               </div>
 
-              {/* Types Selection - Show for most challenges except trainers and fusions (unless gym leader) */}
-              {((editFormData.challenge !== 'trainers' && editFormData.challenge !== 'fusions') || (editFormData.challenge === 'trainers' && editFormData.trainerType === 'gym-leader')) && (
-                <div>
-                  <label className="block text-white font-semibold mb-2">
-                    Pokemon Types * 
-                    {editFormData.challenge === 'trainers' && editFormData.trainerType === 'gym-leader' 
-                      ? ' (Select gym type - 1 only)' 
-                      : ' (Select 1-2)'
-                    }
-                  </label>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
-                    {[
-                      'Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice',
-                      'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug',
-                      'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy'
-                    ].map((type) => (
-                      <button
-                        key={type}
-                        onClick={() => handleEditTypeToggle(type)}
-                        disabled={
-                          !editFormData.types.includes(type) && 
-                          ((editFormData.challenge === 'trainers' && editFormData.trainerType === 'gym-leader' && editFormData.types.length >= 1) ||
-                           (editFormData.challenge !== 'trainers' && editFormData.types.length >= 2))
-                        }
-                        className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                          editFormData.types.includes(type)
-                            ? 'bg-yellow-400 text-black'
-                            : !editFormData.types.includes(type) && 
-                              ((editFormData.challenge === 'trainers' && editFormData.trainerType === 'gym-leader' && editFormData.types.length >= 1) ||
-                               (editFormData.challenge !== 'trainers' && editFormData.types.length >= 2))
-                            ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                            : 'bg-white/20 text-white/80 hover:bg-white/30'
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-white/60 text-sm mt-2">
-                    Selected: {editFormData.types.join(', ') || 'None'}
-                  </p>
+              {/* Types Selection */}
+              <div>
+                <label className="block text-white font-semibold mb-2">Pokemon Types * (Select 1-2)</label>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
+                  {[
+                    'Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice',
+                    'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug',
+                    'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy'
+                  ].map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => handleEditTypeToggle(type)}
+                      disabled={!editFormData.types.includes(type) && editFormData.types.length >= 2}
+                      className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                        editFormData.types.includes(type)
+                          ? 'bg-yellow-400 text-black'
+                          : !editFormData.types.includes(type) && editFormData.types.length >= 2
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-white/20 text-white/80 hover:bg-white/30'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
                 </div>
-              )}
+                <p className="text-white/60 text-sm mt-2">
+                  Selected: {editFormData.types.join(', ') || 'None'}
+                </p>
+              </div>
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
@@ -1614,16 +900,7 @@ const Challenges = () => {
                 </button>
                 <button
                   onClick={handleUpdateChallengeArt}
-                  disabled={
-                    isUpdating || 
-                    !editFormData.name ||
-                    (editFormData.challenge !== 'body-completion' && !editFormData.creator) ||
-                    (editFormData.challenge === 'fusions' && ((!editFormData.pokemon1Image && !editFormData.pokemon1ImageUrl) || (!editFormData.pokemon2Image && !editFormData.pokemon2ImageUrl) || !editFormData.pokemon1Name || !editFormData.pokemon2Name)) ||
-                    (editFormData.challenge === 'themes' && !editFormData.themeName) ||
-                    (editFormData.challenge === 'trainers' && editFormData.trainerType === 'trainer' && editFormData.types.length > 0) ||
-                    (editFormData.challenge === 'trainers' && editFormData.trainerType === 'gym-leader' && editFormData.types.length !== 1) ||
-                    (editFormData.challenge !== 'trainers' && editFormData.challenge !== 'fusions' && editFormData.types.length === 0)
-                  }
+                  disabled={isUpdating || !editFormData.name || !editFormData.creator || editFormData.types.length === 0}
                   className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold disabled:bg-green-400 disabled:cursor-not-allowed"
                 >
                   {isUpdating ? 'Updating...' : 'Update Challenge Art'}

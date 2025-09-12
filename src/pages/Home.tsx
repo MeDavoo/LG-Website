@@ -1388,7 +1388,6 @@ const Home = () => {
                     </div>
                   )}
                 </div>
-                
                 {isPositionEditorMode && (
                   <p className="text-blue-200 text-xs mb-2">
                     Drag Pokemon with artwork to swap their Pokedex positions
