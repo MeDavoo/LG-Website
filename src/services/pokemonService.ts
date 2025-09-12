@@ -425,11 +425,17 @@ export const getArtistRankings = async (artist: string): Promise<{ pokemonId: st
     
     const artistPokemonWithRatings = artistPokemon.map(pokemon => ({
       pokemonId: pokemon.id,
+      averageRating: ratings[pokemon.id]?.averageRating || 0,
       totalPoints: ratings[pokemon.id]?.totalPoints || 0
     }));
     
-    // Sort by total points (highest first)
-    artistPokemonWithRatings.sort((a, b) => b.totalPoints - a.totalPoints);
+    // Sort by average rating (highest first), then by total points as tiebreaker
+    artistPokemonWithRatings.sort((a, b) => {
+      if (b.averageRating !== a.averageRating) {
+        return b.averageRating - a.averageRating;
+      }
+      return b.totalPoints - a.totalPoints;
+    });
     
     // Assign ranks
     return artistPokemonWithRatings.map((pokemon, index) => ({

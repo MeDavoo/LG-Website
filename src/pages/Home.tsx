@@ -750,7 +750,7 @@ const Home = () => {
   
   // Rating sorting and tier display states
   const [ratingSortOrder, setRatingSortOrder] = useState<'none' | 'ascending' | 'descending'>('none'); // Sort by global ranking
-  const [showTiers, setShowTiers] = useState(false); // Toggle tier letters display
+  const [showTiers, setShowTiers] = useState(true); // Toggle tier letters display
 
   // Collapsible filter sections state
   const [collapsedSections, setCollapsedSections] = useState<{

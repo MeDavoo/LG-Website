@@ -13,7 +13,7 @@ import {
 import { useEffect, useState } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Users, Image, Palette, TrendingUp, TrendingDown, Trophy } from 'lucide-react';
-import { getAllPokemon, Pokemon, getArtistRankings, getAllRatings, PokemonRating } from '../services/pokemonService';
+import { getAllPokemon, Pokemon, getArtistRankings, getAllRatings, PokemonRating, getGlobalRankings } from '../services/pokemonService';
 
 ChartJS.register(
   CategoryScale,
@@ -40,6 +40,7 @@ const Statistics = () => {
   const [artistRankings, setArtistRankings] = useState<{ 
     [artist: string]: { pokemonId: string; rank: number; totalPoints: number; pokemon: Pokemon }[] 
   }>({});
+  const [globalRankings, setGlobalRankings] = useState<{ pokemonId: string; rank: number; totalPoints: number }[]>([]);
   const [pokemonRatings, setPokemonRatings] = useState<{ [pokemonId: string]: PokemonRating }>({});
   const [selectedArtist, setSelectedArtist] = useState<string>(''); // New state for selected artist tab
 
@@ -56,6 +57,10 @@ const Statistics = () => {
       // Load all Pokemon ratings
       const ratings = await getAllRatings();
       setPokemonRatings(ratings);
+      
+      // Load global rankings
+      const globalRankingData = await getGlobalRankings();
+      setGlobalRankings(globalRankingData);
       
       // Get unique artists and load their rankings
       const artists = [...new Set(data.map(p => p.artist))];
@@ -162,6 +167,12 @@ const Statistics = () => {
       return 'No ratings';
     }
     return `${avgStars.toFixed(1)}★`;
+  };
+
+  // Helper function to get global rank for a Pokemon
+  const getGlobalRank = (pokemonId: string): number | null => {
+    const globalRanking = globalRankings.find(r => r.pokemonId === pokemonId);
+    return globalRanking ? globalRanking.rank : null;
   };
 
   // Get suggestions for an artist based on their type distribution
@@ -790,9 +801,10 @@ const Statistics = () => {
                                           const rank = context.parsed.y;
                                           const pokemon = sortedByTime[context.dataIndex];
                                           const avgStars = formatAverageStars(pokemon.pokemonId);
+                                          const globalRank = getGlobalRank(pokemon.pokemonId);
                                           return [
                                             `Artist Rank: #${rank}`, 
-                                            `Global Rank: #${pokemon.rank}`,
+                                            `Global Rank: #${globalRank || 'N/A'}`,
                                             `Average Rating: ${avgStars}`
                                           ];
                                         },
