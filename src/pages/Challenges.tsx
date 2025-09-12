@@ -647,6 +647,28 @@ const Challenges = () => {
                             ))}
                           </div>
                           
+                          {/* Challenge-specific info */}
+                          {art.challenge === 'trainers' && art.trainerType && (
+                            <div className="text-white/80 text-xs font-medium">
+                              {art.trainerType === 'gym-leader' ? 'Gym Leader' : 'Trainer'}
+                            </div>
+                          )}
+                          
+                          {art.challenge === 'themes' && art.themeName && (
+                            <div className="text-white/80 text-xs font-medium">
+                              Theme: {art.themeName}
+                            </div>
+                          )}
+                          
+                          {art.challenge === 'fusions' && (art.pokemon1Name || art.pokemon2Name) && (
+                            <div className="text-white/80 text-xs font-medium">
+                              {art.pokemon1Name && art.pokemon2Name 
+                                ? `${art.pokemon1Name} + ${art.pokemon2Name}`
+                                : art.pokemon1Name || art.pokemon2Name
+                              }
+                            </div>
+                          )}
+                          
                           {/* Creator - only show if exists */}
                           {art.creator && (
                             <div className="flex items-center text-white/70 text-xs">
