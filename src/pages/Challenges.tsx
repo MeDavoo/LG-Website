@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllChallengeArt, addChallengeArt, uploadChallengeImage, updateChallengeArt, deleteChallengeArtWithImage, ChallengeArt } from '../services/challengeService';
+import { getAllChallengeArt, addChallengeArt, uploadChallengeImage, uploadPokemonImage, updateChallengeArt, deleteChallengeArtWithImage, ChallengeArt } from '../services/challengeService';
 
 interface ChallengeTab {
   id: string;
@@ -34,8 +34,10 @@ const Challenges = () => {
     // Fusion specific fields
     pokemon1Name: '',
     pokemon1ImageUrl: '',
+    pokemon1Image: null as File | null,
     pokemon2Name: '',
     pokemon2ImageUrl: '',
+    pokemon2Image: null as File | null,
     // Trainer specific fields
     trainerType: 'trainer' as 'trainer' | 'gym-leader',
     // Theme specific fields
@@ -57,8 +59,10 @@ const Challenges = () => {
     // Fusion specific fields
     pokemon1Name: '',
     pokemon1ImageUrl: '',
+    pokemon1Image: null as File | null,
     pokemon2Name: '',
     pokemon2ImageUrl: '',
+    pokemon2Image: null as File | null,
     // Trainer specific fields
     trainerType: 'trainer' as 'trainer' | 'gym-leader',
     // Theme specific fields
@@ -110,8 +114,10 @@ const Challenges = () => {
       // Reset challenge-specific fields
       pokemon1Name: '',
       pokemon1ImageUrl: '',
+      pokemon1Image: null,
       pokemon2Name: '',
       pokemon2ImageUrl: '',
+      pokemon2Image: null,
       trainerType: 'trainer',
       themeName: '',
       // For body-completion, clear creator
@@ -136,8 +142,8 @@ const Challenges = () => {
     }
 
     if (addFormData.challenge === 'fusions') {
-      if (!addFormData.pokemon1Name || !addFormData.pokemon2Name) {
-        showNotification('Please provide names for both Pokemon in the fusion', 'error');
+      if (!addFormData.pokemon1Image || !addFormData.pokemon2Image || !addFormData.pokemon1Name || !addFormData.pokemon2Name) {
+        showNotification('Please provide names and images for both Pokemon in the fusion', 'error');
         return;
       }
     }
@@ -191,10 +197,28 @@ const Challenges = () => {
 
       // Add challenge-specific fields
       if (addFormData.challenge === 'fusions') {
+        // Add Pokemon names
         challengeArtData.pokemon1Name = addFormData.pokemon1Name;
-        challengeArtData.pokemon1ImageUrl = addFormData.pokemon1ImageUrl;
         challengeArtData.pokemon2Name = addFormData.pokemon2Name;
-        challengeArtData.pokemon2ImageUrl = addFormData.pokemon2ImageUrl;
+        
+        // Upload Pokemon images
+        if (addFormData.pokemon1Image) {
+          const pokemon1ImageUrl = await uploadPokemonImage(addFormData.pokemon1Image, addFormData.name, 1);
+          if (!pokemon1ImageUrl) {
+            showNotification('❌ Error uploading Pokemon 1 image. Please try again.', 'error');
+            return;
+          }
+          challengeArtData.pokemon1ImageUrl = pokemon1ImageUrl;
+        }
+        
+        if (addFormData.pokemon2Image) {
+          const pokemon2ImageUrl = await uploadPokemonImage(addFormData.pokemon2Image, addFormData.name, 2);
+          if (!pokemon2ImageUrl) {
+            showNotification('❌ Error uploading Pokemon 2 image. Please try again.', 'error');
+            return;
+          }
+          challengeArtData.pokemon2ImageUrl = pokemon2ImageUrl;
+        }
       }
 
       if (addFormData.challenge === 'trainers') {
@@ -219,8 +243,10 @@ const Challenges = () => {
           image: null,
           pokemon1Name: '',
           pokemon1ImageUrl: '',
+          pokemon1Image: null,
           pokemon2Name: '',
           pokemon2ImageUrl: '',
+          pokemon2Image: null,
           trainerType: 'trainer',
           themeName: ''
         });
@@ -309,8 +335,10 @@ const Challenges = () => {
       image: null,
       pokemon1Name: selectedArt.pokemon1Name || '',
       pokemon1ImageUrl: selectedArt.pokemon1ImageUrl || '',
+      pokemon1Image: null,
       pokemon2Name: selectedArt.pokemon2Name || '',
       pokemon2ImageUrl: selectedArt.pokemon2ImageUrl || '',
+      pokemon2Image: null,
       trainerType: selectedArt.trainerType || 'trainer',
       themeName: selectedArt.themeName || ''
     });
@@ -333,8 +361,8 @@ const Challenges = () => {
     }
 
     if (editFormData.challenge === 'fusions') {
-      if (!editFormData.pokemon1Name || !editFormData.pokemon2Name) {
-        showNotification('Please provide names for both Pokemon in the fusion', 'error');
+      if ((!editFormData.pokemon1Image && !editFormData.pokemon1ImageUrl) || (!editFormData.pokemon2Image && !editFormData.pokemon2ImageUrl) || !editFormData.pokemon1Name || !editFormData.pokemon2Name) {
+        showNotification('Please provide names and images for both Pokemon in the fusion', 'error');
         return;
       }
     }
@@ -393,10 +421,32 @@ const Challenges = () => {
 
       // Add challenge-specific fields
       if (editFormData.challenge === 'fusions') {
+        // Add Pokemon names
         challengeArtData.pokemon1Name = editFormData.pokemon1Name;
-        challengeArtData.pokemon1ImageUrl = editFormData.pokemon1ImageUrl;
         challengeArtData.pokemon2Name = editFormData.pokemon2Name;
+        
+        // Use existing URLs as default
+        challengeArtData.pokemon1ImageUrl = editFormData.pokemon1ImageUrl;
         challengeArtData.pokemon2ImageUrl = editFormData.pokemon2ImageUrl;
+        
+        // Upload new Pokemon images if provided
+        if (editFormData.pokemon1Image) {
+          const pokemon1ImageUrl = await uploadPokemonImage(editFormData.pokemon1Image, editFormData.name, 1);
+          if (!pokemon1ImageUrl) {
+            showNotification('❌ Error uploading Pokemon 1 image. Please try again.', 'error');
+            return;
+          }
+          challengeArtData.pokemon1ImageUrl = pokemon1ImageUrl;
+        }
+        
+        if (editFormData.pokemon2Image) {
+          const pokemon2ImageUrl = await uploadPokemonImage(editFormData.pokemon2Image, editFormData.name, 2);
+          if (!pokemon2ImageUrl) {
+            showNotification('❌ Error uploading Pokemon 2 image. Please try again.', 'error');
+            return;
+          }
+          challengeArtData.pokemon2ImageUrl = pokemon2ImageUrl;
+        }
       }
 
       if (editFormData.challenge === 'trainers') {
@@ -625,7 +675,7 @@ const Challenges = () => {
                           <img
                             src={art.imageUrl}
                             alt={art.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            className={`w-full h-full ${art.challenge === 'trainers' ? 'object-cover object-top' : 'object-cover'} group-hover:scale-105 transition-transform duration-300`}
                           />
                         </div>
                         
@@ -649,23 +699,40 @@ const Challenges = () => {
                           
                           {/* Challenge-specific info */}
                           {art.challenge === 'trainers' && art.trainerType && (
-                            <div className="text-white/80 text-xs font-medium">
+                            <div className="px-2 py-1 bg-gray-500/30 rounded-full text-white text-xs font-medium text-center">
                               {art.trainerType === 'gym-leader' ? 'Gym Leader' : 'Trainer'}
                             </div>
                           )}
                           
                           {art.challenge === 'themes' && art.themeName && (
-                            <div className="text-white/80 text-xs font-medium">
-                              Theme: {art.themeName}
+                            <div className="px-2 py-1 bg-gray-500/30 rounded-full text-white text-xs font-medium text-center">
+                              {art.themeName}
                             </div>
                           )}
                           
-                          {art.challenge === 'fusions' && (art.pokemon1Name || art.pokemon2Name) && (
-                            <div className="text-white/80 text-xs font-medium">
-                              {art.pokemon1Name && art.pokemon2Name 
-                                ? `${art.pokemon1Name} + ${art.pokemon2Name}`
-                                : art.pokemon1Name || art.pokemon2Name
-                              }
+                          {art.challenge === 'fusions' && (art.pokemon1ImageUrl || art.pokemon2ImageUrl) && (
+                            <div className="flex items-center gap-1">
+                              {art.pokemon1ImageUrl && (
+                                <div className="flex flex-col items-center gap-1">
+                                  <img src={art.pokemon1ImageUrl} alt={art.pokemon1Name || "Pokemon 1"} className="w-8 h-8 rounded object-cover" />
+                                  {art.pokemon1Name && (
+                                    <div className="px-2 py-0.5 bg-gray-500/30 rounded-full text-white text-xs font-medium">
+                                      {art.pokemon1Name}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              <span className="text-yellow-400 text-sm">+</span>
+                              {art.pokemon2ImageUrl && (
+                                <div className="flex flex-col items-center gap-1">
+                                  <img src={art.pokemon2ImageUrl} alt={art.pokemon2Name || "Pokemon 2"} className="w-8 h-8 rounded object-cover" />
+                                  {art.pokemon2Name && (
+                                    <div className="px-2 py-0.5 bg-gray-500/30 rounded-full text-white text-xs font-medium">
+                                      {art.pokemon2Name}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                           
@@ -721,20 +788,24 @@ const Challenges = () => {
                         </p>
                       </div>
                       
-                      {/* Types */}
-                      <div>
-                        <h3 className="text-white font-semibold mb-2">Types</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {selectedArt.types.map((type: string) => (
-                            <span
-                              key={type}
-                              className={`px-3 py-1 rounded-lg text-sm font-semibold text-white ${getTypeColor(type)}`}
-                            >
-                              {type}
-                            </span>
-                          ))}
+                      {/* Types - Only show if there are types and not fusion or regular trainer */}
+                      {selectedArt.types.length > 0 && 
+                       selectedArt.challenge !== 'fusions' && 
+                       !(selectedArt.challenge === 'trainers' && selectedArt.trainerType === 'trainer') && (
+                        <div>
+                          <h3 className="text-white font-semibold mb-2">Types</h3>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedArt.types.map((type: string) => (
+                              <span
+                                key={type}
+                                className={`px-3 py-1 rounded-lg text-sm font-semibold text-white ${getTypeColor(type)}`}
+                              >
+                                {type}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
                       
                       {/* Creator - Only show if exists (not for body-completion) */}
                       {selectedArt.creator && (
@@ -747,47 +818,46 @@ const Challenges = () => {
                       )}
 
                       {/* Challenge-specific information */}
-                      {selectedArt.challenge === 'fusions' && (selectedArt.pokemon1Name || selectedArt.pokemon2Name) && (
+                      {selectedArt.challenge === 'fusions' && (selectedArt.pokemon1ImageUrl || selectedArt.pokemon2ImageUrl) && (
                         <div>
                           <h3 className="text-white font-semibold mb-2">Fusion Details</h3>
-                          <div className="bg-white/5 p-3 rounded-lg border border-white/10">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center text-center">
+                          <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                            <div className="flex items-center justify-center gap-6">
                               {/* Pokemon 1 */}
-                              <div className="space-y-2">
+                              <div className="flex flex-col items-center space-y-2">
                                 {selectedArt.pokemon1ImageUrl && (
-                                  <div className="w-16 h-16 mx-auto rounded-lg overflow-hidden bg-white/10">
+                                  <div className="w-32 h-32 rounded-lg overflow-hidden bg-white/10">
                                     <img 
                                       src={selectedArt.pokemon1ImageUrl} 
-                                      alt={selectedArt.pokemon1Name}
+                                      alt={selectedArt.pokemon1Name || "Pokemon 1"}
                                       className="w-full h-full object-cover"
                                     />
                                   </div>
                                 )}
                                 <div className="text-white text-sm font-medium">
-                                  {selectedArt.pokemon1Name || 'Pokemon 1'}
+                                  {selectedArt.pokemon1Name || "Pokemon 1"}
                                 </div>
                               </div>
 
                               {/* Fusion Arrow */}
-                              <div className="text-center">
-                                <div className="text-yellow-400 text-xl font-bold">→</div>
+                              <div className="flex flex-col items-center">
+                                <div className="text-yellow-400 text-3xl font-bold">+</div>
                                 <div className="text-white/60 text-xs">FUSION</div>
-                                <div className="text-yellow-400 text-xl font-bold">←</div>
                               </div>
 
                               {/* Pokemon 2 */}
-                              <div className="space-y-2">
+                              <div className="flex flex-col items-center space-y-2">
                                 {selectedArt.pokemon2ImageUrl && (
-                                  <div className="w-16 h-16 mx-auto rounded-lg overflow-hidden bg-white/10">
+                                  <div className="w-32 h-32 rounded-lg overflow-hidden bg-white/10">
                                     <img 
                                       src={selectedArt.pokemon2ImageUrl} 
-                                      alt={selectedArt.pokemon2Name}
+                                      alt={selectedArt.pokemon2Name || "Pokemon 2"}
                                       className="w-full h-full object-cover"
                                     />
                                   </div>
                                 )}
                                 <div className="text-white text-sm font-medium">
-                                  {selectedArt.pokemon2Name || 'Pokemon 2'}
+                                  {selectedArt.pokemon2Name || "Pokemon 2"}
                                 </div>
                               </div>
                             </div>
@@ -800,13 +870,21 @@ const Challenges = () => {
                         <div>
                           <h3 className="text-white font-semibold mb-2">Trainer Type</h3>
                           <div className="bg-white/10 rounded-lg p-3">
-                            <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${
-                              selectedArt.trainerType === 'gym-leader' 
-                                ? 'bg-purple-500 text-white' 
-                                : 'bg-blue-500 text-white'
-                            }`}>
-                              {selectedArt.trainerType === 'gym-leader' ? 'Gym Leader' : 'Trainer'}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                                selectedArt.trainerType === 'gym-leader' 
+                                  ? 'bg-purple-500 text-white' 
+                                  : 'bg-blue-500 text-white'
+                              }`}>
+                                {selectedArt.trainerType === 'gym-leader' ? 'Gym Leader' : 'Trainer'}
+                              </span>
+                              {/* Show type for gym leaders */}
+                              {selectedArt.trainerType === 'gym-leader' && selectedArt.types.length > 0 && (
+                                <span className={`px-2 py-1 rounded text-xs font-semibold text-white ${getTypeColor(selectedArt.types[0])}`}>
+                                  {selectedArt.types[0]}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1006,15 +1084,39 @@ const Challenges = () => {
                     <h3 className="text-white font-semibold mb-3">Fusion Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                       {/* Pokemon 1 */}
-                      <div>
-                        <label className="block text-white/80 text-sm font-medium mb-2">Pokemon 1 Name *</label>
+                      <div className="space-y-3">
+                        <label className="block text-white/80 text-sm font-medium mb-2">Pokemon 1 *</label>
                         <input
                           type="text"
                           value={addFormData.pokemon1Name}
                           onChange={(e) => setAddFormData(prev => ({ ...prev, pokemon1Name: e.target.value }))}
                           className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                          placeholder="First Pokemon"
+                          placeholder="Pokemon 1 name"
                         />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 5 * 1024 * 1024) {
+                                showNotification('File size too large. Please select an image under 5MB.', 'error');
+                                return;
+                              }
+                              if (!file.type.startsWith('image/')) {
+                                showNotification('Please select a valid image file.', 'error');
+                                return;
+                              }
+                              setAddFormData(prev => ({ ...prev, pokemon1Image: file }));
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
+                        />
+                        {addFormData.pokemon1Image && (
+                          <div className="mt-2 text-sm text-green-400">
+                            ✅ {addFormData.pokemon1Image.name}
+                          </div>
+                        )}
                       </div>
 
                       {/* Fusion Arrow */}
@@ -1025,15 +1127,39 @@ const Challenges = () => {
                       </div>
 
                       {/* Pokemon 2 */}
-                      <div>
-                        <label className="block text-white/80 text-sm font-medium mb-2">Pokemon 2 Name *</label>
+                      <div className="space-y-3">
+                        <label className="block text-white/80 text-sm font-medium mb-2">Pokemon 2 *</label>
                         <input
                           type="text"
                           value={addFormData.pokemon2Name}
                           onChange={(e) => setAddFormData(prev => ({ ...prev, pokemon2Name: e.target.value }))}
                           className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                          placeholder="Second Pokemon"
+                          placeholder="Pokemon 2 name"
                         />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 5 * 1024 * 1024) {
+                                showNotification('File size too large. Please select an image under 5MB.', 'error');
+                                return;
+                              }
+                              if (!file.type.startsWith('image/')) {
+                                showNotification('Please select a valid image file.', 'error');
+                                return;
+                              }
+                              setAddFormData(prev => ({ ...prev, pokemon2Image: file }));
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
+                        />
+                        {addFormData.pokemon2Image && (
+                          <div className="mt-2 text-sm text-green-400">
+                            ✅ {addFormData.pokemon2Image.name}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1167,7 +1293,7 @@ const Challenges = () => {
                     !addFormData.name || 
                     !addFormData.image ||
                     (addFormData.challenge !== 'body-completion' && !addFormData.creator) ||
-                    (addFormData.challenge === 'fusions' && (!addFormData.pokemon1Name || !addFormData.pokemon2Name)) ||
+                    (addFormData.challenge === 'fusions' && (!addFormData.pokemon1Image || !addFormData.pokemon2Image || !addFormData.pokemon1Name || !addFormData.pokemon2Name)) ||
                     (addFormData.challenge === 'themes' && !addFormData.themeName) ||
                     (addFormData.challenge === 'trainers' && addFormData.trainerType === 'trainer' && addFormData.types.length > 0) ||
                     (addFormData.challenge === 'trainers' && addFormData.trainerType === 'gym-leader' && addFormData.types.length !== 1) ||
@@ -1270,15 +1396,45 @@ const Challenges = () => {
                     <h3 className="text-white font-semibold mb-3">Fusion Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                       {/* Pokemon 1 */}
-                      <div>
-                        <label className="block text-white/80 text-sm font-medium mb-2">Pokemon 1 Name *</label>
+                      <div className="space-y-3">
+                        <label className="block text-white/80 text-sm font-medium mb-2">Pokemon 1 *</label>
                         <input
                           type="text"
                           value={editFormData.pokemon1Name}
                           onChange={(e) => setEditFormData(prev => ({ ...prev, pokemon1Name: e.target.value }))}
                           className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                          placeholder="First Pokemon"
+                          placeholder="Pokemon 1 name"
                         />
+                        {editFormData.pokemon1ImageUrl && (
+                          <div className="mb-2">
+                            <img src={editFormData.pokemon1ImageUrl} alt="Current Pokemon 1" className="w-20 h-20 object-cover rounded-lg border border-white/20" />
+                            <p className="text-xs text-white/60 mt-1">Current image</p>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 5 * 1024 * 1024) {
+                                showNotification('File size too large. Please select an image under 5MB.', 'error');
+                                return;
+                              }
+                              if (!file.type.startsWith('image/')) {
+                                showNotification('Please select a valid image file.', 'error');
+                                return;
+                              }
+                              setEditFormData(prev => ({ ...prev, pokemon1Image: file }));
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
+                        />
+                        {editFormData.pokemon1Image && (
+                          <div className="mt-2 text-sm text-green-400">
+                            ✅ New: {editFormData.pokemon1Image.name}
+                          </div>
+                        )}
                       </div>
 
                       {/* Fusion Arrow */}
@@ -1289,15 +1445,45 @@ const Challenges = () => {
                       </div>
 
                       {/* Pokemon 2 */}
-                      <div>
-                        <label className="block text-white/80 text-sm font-medium mb-2">Pokemon 2 Name *</label>
+                      <div className="space-y-3">
+                        <label className="block text-white/80 text-sm font-medium mb-2">Pokemon 2 *</label>
                         <input
                           type="text"
                           value={editFormData.pokemon2Name}
                           onChange={(e) => setEditFormData(prev => ({ ...prev, pokemon2Name: e.target.value }))}
                           className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                          placeholder="Second Pokemon"
+                          placeholder="Pokemon 2 name"
                         />
+                        {editFormData.pokemon2ImageUrl && (
+                          <div className="mb-2">
+                            <img src={editFormData.pokemon2ImageUrl} alt="Current Pokemon 2" className="w-20 h-20 object-cover rounded-lg border border-white/20" />
+                            <p className="text-xs text-white/60 mt-1">Current image</p>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 5 * 1024 * 1024) {
+                                showNotification('File size too large. Please select an image under 5MB.', 'error');
+                                return;
+                              }
+                              if (!file.type.startsWith('image/')) {
+                                showNotification('Please select a valid image file.', 'error');
+                                return;
+                              }
+                              setEditFormData(prev => ({ ...prev, pokemon2Image: file }));
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
+                        />
+                        {editFormData.pokemon2Image && (
+                          <div className="mt-2 text-sm text-green-400">
+                            ✅ New: {editFormData.pokemon2Image.name}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1432,7 +1618,7 @@ const Challenges = () => {
                     isUpdating || 
                     !editFormData.name ||
                     (editFormData.challenge !== 'body-completion' && !editFormData.creator) ||
-                    (editFormData.challenge === 'fusions' && (!editFormData.pokemon1Name || !editFormData.pokemon2Name)) ||
+                    (editFormData.challenge === 'fusions' && ((!editFormData.pokemon1Image && !editFormData.pokemon1ImageUrl) || (!editFormData.pokemon2Image && !editFormData.pokemon2ImageUrl) || !editFormData.pokemon1Name || !editFormData.pokemon2Name)) ||
                     (editFormData.challenge === 'themes' && !editFormData.themeName) ||
                     (editFormData.challenge === 'trainers' && editFormData.trainerType === 'trainer' && editFormData.types.length > 0) ||
                     (editFormData.challenge === 'trainers' && editFormData.trainerType === 'gym-leader' && editFormData.types.length !== 1) ||
