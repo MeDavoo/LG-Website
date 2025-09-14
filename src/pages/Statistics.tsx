@@ -749,11 +749,9 @@ const Statistics = () => {
                       <div className="bg-white/5 rounded-lg p-4">
                         <div className="h-80">
                           {(() => {
-                            // Sort Pokemon by their ID/pokedexNumber to show chronological order
+                            // Sort Pokemon by their pokedexNumber to show chronological order
                             const sortedByTime = [...artistRankings[stat.artist]].sort((a, b) => {
-                              const aNumber = parseInt(a.pokemon.id) || a.pokemon.pokedexNumber || 0;
-                              const bNumber = parseInt(b.pokemon.id) || b.pokemon.pokedexNumber || 0;
-                              return aNumber - bNumber;
+                              return a.pokemon.pokedexNumber - b.pokemon.pokedexNumber;
                             });
                             
                             // Find the rank of each Pokemon within this artist's collection
@@ -795,7 +793,7 @@ const Statistics = () => {
                                         title: (context: any) => {
                                           const index = context[0].dataIndex;
                                           const pokemon = sortedByTime[index].pokemon;
-                                          return `${pokemon.name} (#${parseInt(pokemon.id) || pokemon.pokedexNumber || '?'})`;
+                                          return `${pokemon.name} (#${pokemon.pokedexNumber.toString().padStart(3, '0')})`;
                                         },
                                         label: (context: any) => {
                                           const rank = context.parsed.y;
@@ -810,7 +808,7 @@ const Statistics = () => {
                                         },
                                         afterLabel: (context: any) => {
                                           const pokemon = sortedByTime[context.dataIndex].pokemon;
-                                          return `Pokemon ID: ${pokemon.id}`;
+                                          return `Pokedex #${pokemon.pokedexNumber.toString().padStart(3, '0')}`;
                                         },
                                       },
                                     },
