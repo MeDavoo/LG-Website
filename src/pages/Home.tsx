@@ -1294,8 +1294,23 @@ const Home = () => {
                     {userRatingStats.averageRating > 0 ? userRatingStats.averageRating.toFixed(1) : '0.0'}
                   </div>
                   <div className="text-white/70 text-xs">Average Stars</div>
-                  <div className="text-white/50 text-xs">
-                    ({userRatingStats.totalRatings} {userRatingStats.totalRatings === 1 ? 'vote' : 'votes'})
+                  
+                  {/* Vote Progress Bar */}
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-white/50 text-xs">Votes</span>
+                      <span className="text-white/70 text-xs font-semibold">
+                        {userRatingStats.totalRatings}/{Math.max(151, userRatingStats.totalRatings)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-600 rounded-full h-2 overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full transition-all duration-500 ease-out"
+                        style={{
+                          width: `${Math.min(100, (userRatingStats.totalRatings / Math.max(151, userRatingStats.totalRatings)) * 100)}%`
+                        }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
                 
