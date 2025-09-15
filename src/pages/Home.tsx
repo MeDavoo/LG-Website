@@ -1827,7 +1827,7 @@ const Home = () => {
                       };
                       
                       // NEW APPROACH: Find the complete evolution line by traversing in both directions
-                      // Rule: Stop when we encounter a Pokemon that goes back to Stage 0 (different evolution line)
+                      // Rule: Stop when we encounter a Pokemon that goes back to Stage 0 AND doesn't evolve (different evolution line)
                       
                       // First, find the start of the evolution line (Stage 0)
                       let evolutionStart = currentId;
@@ -1837,8 +1837,13 @@ const Home = () => {
                         const pokemon = getPokemonById(checkId);
                         if (!pokemon) continue;
                         
-                        // If we find Stage 0, this could be our evolution start
+                        // If we find Stage 0, check if it's part of the same evolution line
                         if (pokemon.evolutionStage === 0) {
+                          // If this Stage 0 Pokemon doesn't evolve (U0), it's a different evolution line
+                          if (pokemon.unique === 'U0') {
+                            break; // Stop here, don't include this Stage 0
+                          }
+                          // Otherwise, this Stage 0 is part of our evolution line
                           evolutionStart = checkId;
                           break;
                         }
@@ -1863,15 +1868,32 @@ const Home = () => {
                         const pokemon = getPokemonById(checkId);
                         if (!pokemon) continue;
                         
+                        // Special case: If this is a Stage 0 Pokemon that doesn't evolve (U0), 
+                        // only include it if it's the current Pokemon or we're at the start
+                        if (pokemon.evolutionStage === 0 && pokemon.unique === 'U0' && checkId !== currentId && checkId !== evolutionStart) {
+                          // This is a different non-evolving Stage 0, skip it
+                          break;
+                        }
+                        
                         // Add this Pokemon to the evolution line
                         safeAddPokemon(pokemon);
+                        
+                        // If this is a Stage 0 that doesn't evolve, and it's not the current Pokemon, stop here
+                        if (pokemon.evolutionStage === 0 && pokemon.unique === 'U0' && checkId !== currentId) {
+                          break;
+                        }
                         
                         // Check what's next
                         const nextPokemon = getPokemonById(checkId + 1);
                         if (!nextPokemon) break;
                         
-                        // STOPPING RULE: If next Pokemon is Stage 0, we've reached a new evolution line
-                        if (nextPokemon.evolutionStage === 0) {
+                        // STOPPING RULE: If next Pokemon is Stage 0 and doesn't evolve, we've reached a new evolution line
+                        if (nextPokemon.evolutionStage === 0 && nextPokemon.unique === 'U0') {
+                          break;
+                        }
+                        
+                        // STOPPING RULE: If next Pokemon is Stage 0 and we already have Stage 0 in our line, new evolution line
+                        if (nextPokemon.evolutionStage === 0 && evolutionButtons.some(btn => btn.evolutionStage === 0)) {
                           break;
                         }
                         
