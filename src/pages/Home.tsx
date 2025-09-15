@@ -105,16 +105,22 @@ const Home = () => {
       const deviceId = getDeviceId();
       const allRatings = await getAllRatings();
       
-      // Find all ratings made by this device
+      // Get current Pokemon IDs to filter out deleted Pokemon ratings
+      const existingPokemonIds = new Set(pokemonSlots.filter(p => p.hasArt && p.firebaseId).map(p => p.firebaseId));
+      
+      // Find all ratings made by this device for existing Pokemon only
       const userRatings: number[] = [];
       const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 };
       
-      Object.values(allRatings).forEach(pokemonRating => {
-        const userRating = pokemonRating.ratings[deviceId];
-        if (userRating) {
-          userRatings.push(userRating);
-          if (userRating >= 1 && userRating <= 10) {
-            ratingDistribution[userRating as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10]++;
+      Object.entries(allRatings).forEach(([pokemonId, pokemonRating]) => {
+        // Only count ratings for Pokemon that still exist
+        if (existingPokemonIds.has(pokemonId)) {
+          const userRating = pokemonRating.ratings[deviceId];
+          if (userRating) {
+            userRatings.push(userRating);
+            if (userRating >= 1 && userRating <= 10) {
+              ratingDistribution[userRating as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10]++;
+            }
           }
         }
       });
