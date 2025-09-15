@@ -85,8 +85,8 @@ const Home = () => {
       
       setPokemonSlots(slots);
       
-      // Load user rating statistics
-      await loadUserRatingStats();
+      // Load user rating statistics AFTER setting slots
+      await loadUserRatingStats(slots);
       
       // If this is not the initial load, set fast animations immediately
       if (!isInitialLoad) {
@@ -100,13 +100,16 @@ const Home = () => {
   };
 
   // Load and calculate user's rating statistics
-  const loadUserRatingStats = async () => {
+  const loadUserRatingStats = async (slots?: PokemonSlot[]) => {
     try {
       const deviceId = getDeviceId();
       const allRatings = await getAllRatings();
       
+      // Use provided slots or fallback to current pokemonSlots
+      const currentSlots = slots || pokemonSlots;
+      
       // Get current Pokemon IDs to filter out deleted Pokemon ratings
-      const existingPokemonIds = new Set(pokemonSlots.filter(p => p.hasArt && p.firebaseId).map(p => p.firebaseId));
+      const existingPokemonIds = new Set(currentSlots.filter(p => p.hasArt && p.firebaseId).map(p => p.firebaseId));
       
       // Find all ratings made by this device for existing Pokemon only
       const userRatings: number[] = [];
@@ -205,7 +208,7 @@ const Home = () => {
         artist: editFormData.artist,
         types: editFormData.types,
         evolutionStage: editFormData.evolutionStage,
-        ...(editFormData.unique && { unique: editFormData.unique }),
+        unique: editFormData.unique, // Always include unique field, even if empty string
         ...(imageUrl !== selectedPokemon.imageUrl && { imageUrl }), // Only update if image changed
         updatedAt: new Date()
       };
@@ -1306,14 +1309,18 @@ const Home = () => {
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-white/50 text-xs">Votes</span>
                       <span className="text-white/70 text-xs font-semibold">
-                        {userRatingStats.totalRatings}/{Math.max(151, userRatingStats.totalRatings)}
+                        {userRatingStats.totalRatings}/{pokemonSlots.filter(p => p.hasArt).length}
                       </span>
                     </div>
                     <div className="w-full bg-gray-600 rounded-full h-2 overflow-hidden">
                       <div 
-                        className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full transition-all duration-500 ease-out"
+                        className={`h-full rounded-full transition-all duration-500 ease-out ${
+                          userRatingStats.totalRatings >= pokemonSlots.filter(p => p.hasArt).length && pokemonSlots.filter(p => p.hasArt).length > 0
+                            ? 'bg-gradient-to-r from-green-400 to-green-500' 
+                            : 'bg-gradient-to-r from-yellow-400 to-yellow-500'
+                        }`}
                         style={{
-                          width: `${Math.min(100, (userRatingStats.totalRatings / Math.max(151, userRatingStats.totalRatings)) * 100)}%`
+                          width: `${pokemonSlots.filter(p => p.hasArt).length > 0 ? Math.min(100, (userRatingStats.totalRatings / pokemonSlots.filter(p => p.hasArt).length) * 100) : 0}%`
                         }}
                       ></div>
                     </div>
