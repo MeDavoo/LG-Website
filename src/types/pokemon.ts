@@ -5,6 +5,9 @@ export interface Pokemon {
   artist: string;
   imageUrl: string;
   additionalImages?: string[]; // Array of up to 3 additional image URLs
+  pokedexNumber?: number; // Pokedex number for ordering
+  unique?: string; // U0, U1, U2 for unique Pokemon (0=no evolve, 1=evolves once, 2=evolves twice)
+  evolutionStage?: number; // 0=base, 1=first evo, 2=second evo, 3=GMAX, 4=Legendary, 5=MEGA
   description?: string;
   stats?: {
     hp: number;
