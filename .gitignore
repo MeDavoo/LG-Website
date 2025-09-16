@@ -1,4 +1,9 @@
 node_modules
 
+# Environment variables (contains sensitive data)
+.env
+.env.local
+.env.production
+
 # Admin configuration (contains sensitive password)
 src/config/admin.ts
