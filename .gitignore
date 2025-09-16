@@ -1,1 +1,4 @@
 node_modules
+
+# Admin configuration (contains sensitive password)
+src/config/admin.ts

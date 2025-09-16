@@ -1,8 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Home, BarChart3, Palette, RotateCw } from 'lucide-react';
+import { useAdminAuth } from '../contexts/AdminAuthContext';
 
 const Navbar = () => {
   const location = useLocation();
+  const { isAdmin, logout } = useAdminAuth();
   
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
@@ -15,14 +17,30 @@ const Navbar = () => {
     <nav className="bg-white/10 backdrop-blur-md border-b border-white/20">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-full overflow-hidden">
-              <img src="/lgicon.png" alt="LG Icon" className="w-full h-full object-cover" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-yellow-300 font-bold text-xl">LG Pokedex</span>
-            </div>
-          </Link>
+          <div className="flex items-center space-x-4">
+            <Link to="/" className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-full overflow-hidden">
+                <img src="/lgicon.png" alt="LG Icon" className="w-full h-full object-cover" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-yellow-300 font-bold text-xl">LG Pokedex</span>
+              </div>
+            </Link>
+            
+            {/* Admin Indicator */}
+            {isAdmin && (
+              <div className="flex items-center space-x-2 bg-green-500/20 border border-green-500/30 rounded-lg px-3 py-1">
+                <span className="text-green-400 text-sm font-semibold">Admin</span>
+                <button
+                  onClick={logout}
+                  className="text-green-400 hover:text-red-400 text-xs ml-1 opacity-70 hover:opacity-100 transition-colors"
+                  title="Logout"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
           
           <div className="flex space-x-1">
             {navItems.map(({ path, label, icon: Icon }) => (

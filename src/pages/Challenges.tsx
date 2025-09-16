@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAllChallengeArt, addChallengeArt, uploadChallengeImage, uploadPokemonImage, updateChallengeArt, deleteChallengeArtWithImage, ChallengeArt } from '../services/challengeService';
+import { useAdminAuth } from '../contexts/AdminAuthContext';
 
 interface ChallengeTab {
   id: string;
@@ -17,6 +18,7 @@ const CHALLENGE_TABS: ChallengeTab[] = [
 ];
 
 const Challenges = () => {
+  const { requireAdmin } = useAdminAuth();
   const [activeTab, setActiveTab] = useState<string>('alt-evo');
   const [challengeArt, setChallengeArt] = useState<ChallengeArt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -753,7 +755,7 @@ const Challenges = () => {
               {/* Add Art Button */}
               <div className="mt-4 text-center">
                 <button
-                  onClick={() => setShowAddForm(true)}
+                  onClick={() => requireAdmin(() => setShowAddForm(true))}
                   className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold flex items-center space-x-2 mx-auto"
                 >
                   <span>Add New Art</span>
@@ -938,7 +940,7 @@ const Challenges = () => {
                               <div className="flex gap-1">
                                 {/* Edit Button (80% width) */}
                                 <button
-                                  onClick={handleEditChallengeArt}
+                                  onClick={() => requireAdmin(handleEditChallengeArt)}
                                   className="flex-[4] px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold transform hover:scale-[1.02]"
                                 >
                                   ✏️ Edit Art
@@ -946,7 +948,7 @@ const Challenges = () => {
                                 
                                 {/* Delete Button (20% width, emoji only) */}
                                 <button
-                                  onClick={() => setShowDeleteConfirm(true)}
+                                  onClick={() => requireAdmin(() => setShowDeleteConfirm(true))}
                                   className="flex-1 px-2 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-center transform hover:scale-[1.02]"
                                   title="Delete Art"
                                 >
@@ -968,7 +970,7 @@ const Challenges = () => {
                                       Cancel
                                     </button>
                                     <button
-                                      onClick={handleDeleteChallengeArt}
+                                      onClick={() => requireAdmin(handleDeleteChallengeArt)}
                                       disabled={isDeleting}
                                       className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm disabled:bg-red-400 disabled:cursor-not-allowed"
                                     >

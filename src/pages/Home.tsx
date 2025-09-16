@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber, saveRating, getAllRatings, getGlobalRankings } from '../services/pokemonService';
 import Navbar from '../components/Navbar';
+import { useAdminAuth } from '../contexts/AdminAuthContext';
 
 interface PokemonSlot {
   id: number;
@@ -17,6 +18,9 @@ interface PokemonSlot {
 }
 
 const Home = () => {
+  // Admin authentication
+  const { requireAdmin } = useAdminAuth();
+  
   // Pokemon data from Firebase
   const [_pokemonData, setPokemonData] = useState<Pokemon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2202,7 +2206,7 @@ const Home = () => {
                             <div className="flex gap-1">
                               {/* Edit Button (80% width) */}
                               <button
-                                onClick={handleEditPokemon}
+                                onClick={() => requireAdmin(handleEditPokemon)}
                                 className="flex-[4] px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold transform hover:scale-[1.02]"
                               >
                                 ✏️ Edit Pokemon
@@ -2265,7 +2269,7 @@ const Home = () => {
                     <p className="text-white/60 text-sm">Add a new Pokemon to your collection</p>
                   </div>
                   <button
-                    onClick={() => setShowAddForm(true)}
+                    onClick={() => requireAdmin(() => setShowAddForm(true))}
                     className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold flex items-center space-x-2"
                   >
                     <span className="text-xl">➕</span>
