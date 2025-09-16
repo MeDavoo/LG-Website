@@ -4,6 +4,3 @@ node_modules
 .env
 .env.local
 .env.production
-
-# Admin configuration (contains sensitive password)
-src/config/admin.ts
