@@ -4,6 +4,7 @@ export interface Pokemon {
   types: PokemonType[];
   artist: string;
   imageUrl: string;
+  additionalImages?: string[]; // Array of up to 3 additional image URLs
   description?: string;
   stats?: {
     hp: number;

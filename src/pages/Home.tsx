@@ -7,6 +7,7 @@ interface PokemonSlot {
   name: string;
   artist?: string;
   imageUrl?: string;
+  additionalImages?: string[]; // Array of up to 3 additional image URLs
   types?: string[];
   type2?: string;
   hasArt: boolean;
@@ -67,6 +68,7 @@ const Home = () => {
             name: pokemonFromFirebase.name,
             artist: pokemonFromFirebase.artist,
             imageUrl: pokemonFromFirebase.imageUrl,
+            additionalImages: pokemonFromFirebase.additionalImages || [],
             types: pokemonFromFirebase.types,
             type2: pokemonFromFirebase.types?.[1],
             unique: pokemonFromFirebase.unique,
@@ -176,6 +178,7 @@ const Home = () => {
       unique: selectedPokemon.unique || '',
       evolutionStage: selectedPokemon.evolutionStage || 0,
       image: null, // Reset image field
+      additionalImages: [], // Reset additional images field
     });
     setShowEditForm(true);
   };
@@ -191,6 +194,7 @@ const Home = () => {
     setIsUpdating(true);
     try {
       let imageUrl = selectedPokemon.imageUrl; // Keep existing image by default
+      let additionalImages = selectedPokemon.additionalImages || []; // Keep existing additional images by default
       
       // If a new image was selected, upload it to Cloudinary
       if (editFormData.image) {
@@ -203,6 +207,30 @@ const Home = () => {
         imageUrl = newImageUrl;
       }
 
+      // If additional images were selected, upload them to Cloudinary
+      if (editFormData.additionalImages.length > 0) {
+        const uploadPromises = editFormData.additionalImages.map((file, index) => 
+          uploadPokemonImage(file, `${editFormData.name}_additional_${index + 1}`)
+        );
+        
+        const uploadedUrls = await Promise.all(uploadPromises);
+        const validUrls = uploadedUrls.filter(url => url !== null) as string[];
+        
+        if (validUrls.length !== editFormData.additionalImages.length) {
+          showNotification('❌ Some additional images failed to upload. Please try again.', 'error');
+          setIsUpdating(false);
+          return;
+        }
+        
+        additionalImages = validUrls;
+      }
+
+      // Handle final additional images - combine existing (after deletions) with new uploads
+      let finalAdditionalImages = selectedPokemon.additionalImages || [];
+      if (editFormData.additionalImages.length > 0) {
+        finalAdditionalImages = [...finalAdditionalImages, ...additionalImages];
+      }
+
       const updates = {
         name: editFormData.name,
         artist: editFormData.artist,
@@ -210,6 +238,7 @@ const Home = () => {
         evolutionStage: editFormData.evolutionStage,
         unique: editFormData.unique, // Always include unique field, even if empty string
         ...(imageUrl !== selectedPokemon.imageUrl && { imageUrl }), // Only update if image changed
+        additionalImages: finalAdditionalImages, // Always update to reflect any additions or deletions
         updatedAt: new Date()
       };
 
@@ -226,7 +255,8 @@ const Home = () => {
           types: editFormData.types,
           evolutionStage: editFormData.evolutionStage,
           unique: editFormData.unique,
-          imageUrl: imageUrl
+          imageUrl: imageUrl,
+          additionalImages: finalAdditionalImages
         } : null);
         
         await loadPokemonData(); // Refresh the data
@@ -352,6 +382,29 @@ const Home = () => {
       
       setEditFormData(prev => ({ ...prev, image: file }));
     }
+  };
+
+  // Handle additional images change for Edit form
+  const handleAdditionalImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 3) {
+      showNotification('You can only upload up to 3 additional images', 'error');
+      return;
+    }
+    
+    // Validate each file
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
+        showNotification('Each image should be less than 5MB', 'error');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        showNotification('Please select valid image files only', 'error');
+        return;
+      }
+    }
+    
+    setEditFormData(prev => ({ ...prev, additionalImages: files }));
   };
 
   // Handle paste for Add form
@@ -520,6 +573,7 @@ const Home = () => {
     unique: '',
     evolutionStage: 0,
     image: null as File | null,
+    additionalImages: [] as File[], // Up to 3 additional images
   });
   const [addFormData, setAddFormData] = useState({
     name: '',
@@ -538,6 +592,9 @@ const Home = () => {
   const [draggedPokemon, setDraggedPokemon] = useState<PokemonSlot | null>(null);
   const [positionFeedback, setPositionFeedback] = useState<string>('');
   const [showPositionFeedback, setShowPositionFeedback] = useState(false);
+  
+  // Image switching state for additional images
+  const [currentDisplayImage, setCurrentDisplayImage] = useState<string | null>(null);
   
   // Notification system
   const [notification, setNotification] = useState<{
@@ -610,6 +667,12 @@ const Home = () => {
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!imageRef.current) return;
     
+    // Check if the mouse is over a button (exclude buttons from 3D effect)
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return; // Don't apply 3D effect when hovering over buttons
+    }
+    
     const rect = imageRef.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
@@ -625,6 +688,51 @@ const Home = () => {
 
   const handleMouseLeave = () => {
     setImageTransform({ rotateX: 0, rotateY: 0 });
+  };
+
+  // Image switching functions for additional images
+  const handleImageSwitch = (clickedImageUrl: string) => {
+    if (!selectedPokemon) return;
+    
+    // Simple toggle logic: whatever is clicked becomes the main display
+    if (clickedImageUrl === selectedPokemon.imageUrl) {
+      // Clicking main image button - switch back to main
+      setCurrentDisplayImage(null);
+    } else {
+      // Clicking additional image button - switch to that image
+      setCurrentDisplayImage(clickedImageUrl);
+    }
+  };
+
+  // Get the currently displayed image URL
+  const getDisplayedImageUrl = (): string => {
+    if (currentDisplayImage && selectedPokemon) {
+      return currentDisplayImage;
+    }
+    return selectedPokemon?.imageUrl || '';
+  };
+
+  // Reset displayed image when Pokemon changes
+  useEffect(() => {
+    setCurrentDisplayImage(null);
+  }, [selectedPokemon?.id]);
+
+  // Handle deleting additional images
+  const handleDeleteAdditionalImage = (imageUrl: string) => {
+    if (!selectedPokemon) return;
+    
+    const updatedImages = selectedPokemon.additionalImages?.filter(url => url !== imageUrl) || [];
+    
+    // Update selected Pokemon state immediately
+    setSelectedPokemon(prev => prev ? {
+      ...prev,
+      additionalImages: updatedImages
+    } : null);
+    
+    // If the deleted image was currently displayed, reset to main image
+    if (currentDisplayImage === imageUrl) {
+      setCurrentDisplayImage(null);
+    }
   };
 
   // Rating System Functions
@@ -1707,11 +1815,54 @@ const Home = () => {
                           }}
                         >
                           <img
-                            src={selectedPokemon.imageUrl}
+                            src={getDisplayedImageUrl()}
                             alt={selectedPokemon.name}
                             className="w-full h-auto object-contain max-h-[32rem]"
                           />
                         </div>
+                        
+                        {/* Additional Image Buttons - Vertical layout, positioned absolutely far right */}
+                        {selectedPokemon.additionalImages && selectedPokemon.additionalImages.length > 0 && (
+                          <div className="absolute bottom-0 right-[-60px] flex flex-col gap-2 z-10">
+                            {/* Show main image button only if we're NOT currently viewing the main image */}
+                            {currentDisplayImage && (
+                              <button
+                                onClick={() => handleImageSwitch(selectedPokemon.imageUrl!)}
+                                className="w-12 h-12 rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-110 border-yellow-400/70 hover:border-yellow-300 shadow-md shadow-yellow-400/25"
+                                title="Main image"
+                              >
+                                <img
+                                  src={selectedPokemon.imageUrl}
+                                  alt="Main"
+                                  className="w-full h-full object-cover"
+                                />
+                              </button>
+                            )}
+                            
+                            {/* Show additional image buttons only if they're NOT currently displayed */}
+                            {selectedPokemon.additionalImages.map((imageUrl, index) => {
+                              // Only show this button if this image is NOT currently displayed
+                              if (currentDisplayImage === imageUrl) {
+                                return null;
+                              }
+
+                              return (
+                                <button
+                                  key={index}
+                                  onClick={() => handleImageSwitch(imageUrl)}
+                                  className="w-12 h-12 rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-110 border-white/40 hover:border-white/60"
+                                  title={`Additional image ${index + 1}`}
+                                >
+                                  <img
+                                    src={imageUrl}
+                                    alt={`Additional ${index + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       {/* Next Arrow */}
@@ -2192,6 +2343,69 @@ const Home = () => {
                   )}
                   <p className="text-white/40 text-xs mt-1">
                     You can paste an image here (Ctrl+V or Cmd+V) or click to browse files. Max size: 5MB.
+                  </p>
+                </div>
+              </div>
+
+              {/* Additional Images Upload (Edit Only) */}
+              <div>
+                <label className="block text-white font-semibold mb-2">
+                  Additional Images <span className="text-xs text-white/60">(Up to 3 images)</span>
+                </label>
+                
+                {/* Existing Additional Images */}
+                {selectedPokemon.additionalImages && selectedPokemon.additionalImages.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-white/60 text-sm mb-2">Current Additional Images:</p>
+                    <div className="flex gap-3 flex-wrap">
+                      {selectedPokemon.additionalImages.map((imageUrl, index) => (
+                        <div key={index} className="relative group">
+                          <div className="w-20 h-20 rounded-lg overflow-hidden border border-white/20">
+                            <img
+                              src={imageUrl}
+                              alt={`Additional ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <button
+                            onClick={() => handleDeleteAdditionalImage(imageUrl)}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs flex items-center justify-center transition-all duration-200 opacity-0 group-hover:opacity-100"
+                            title="Delete this image"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Upload New Additional Images */}
+                <div>
+                  <p className="text-white/60 text-sm mb-2">Add New Additional Images:</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleAdditionalImagesChange}
+                    className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-500 file:text-white hover:file:bg-purple-600"
+                  />
+                  {editFormData.additionalImages.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-green-400 text-sm mb-2">
+                        ✅ {editFormData.additionalImages.length} new image{editFormData.additionalImages.length > 1 ? 's' : ''} selected
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {editFormData.additionalImages.map((file, index) => (
+                          <div key={index} className="text-xs text-white/60 bg-white/10 px-2 py-1 rounded">
+                            {file.name}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-white/40 text-xs mt-1">
+                    Select up to 3 additional images. These will appear as clickable buttons in the detail view. Max size: 5MB each.
                   </p>
                 </div>
               </div>
