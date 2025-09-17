@@ -85,7 +85,7 @@ const Statistics = () => {
 
   // Calculate statistics
   const totalPokemon = pokemonData.length;
-  const totalSlots = 151;
+  const totalSlots = 176;
   const completionPercentage = Math.round((totalPokemon / totalSlots) * 100);
 
   // Type distribution for all Pokemon

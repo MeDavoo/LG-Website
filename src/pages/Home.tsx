@@ -25,7 +25,7 @@ const Home = () => {
   const [_pokemonData, setPokemonData] = useState<Pokemon[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Create 151 Pokemon slots (like a Pokedex) from Firebase data
+  // Create 176 Pokemon slots (like a Pokedex) from Firebase data
   const [pokemonSlots, setPokemonSlots] = useState<PokemonSlot[]>([]);
 
   // Animation timing system
@@ -61,9 +61,9 @@ const Home = () => {
       const firebasePokemon = await getAllPokemon();
       setPokemonData(firebasePokemon);
       
-      // Create 151 slots and populate with Firebase data
+      // Create 176 slots and populate with Firebase data
       const slots: PokemonSlot[] = [];
-      for (let i = 1; i <= 151; i++) {
+      for (let i = 1; i <= 176; i++) {
         const pokemonFromFirebase = firebasePokemon.find(p => p.pokedexNumber === i);
         
         if (pokemonFromFirebase) {
@@ -1514,7 +1514,7 @@ const Home = () => {
                   </h2>
                   {!isPositionEditorMode && (
                     <div className="text-white/60 text-sm mb-2">
-                      <span className="text-yellow-300 font-bold">{sortedPokemon.filter(p => p.hasArt).length}</span> / 151 Pokemon Found
+                      <span className="text-yellow-300 font-bold">{sortedPokemon.filter(p => p.hasArt).length}</span> / 176 Pokemon Found
                       {hasActiveFilters && (
                         <span className="ml-2 text-blue-300">
                           ({sortedPokemon.length} filtered)
@@ -2019,7 +2019,7 @@ const Home = () => {
                       }
                       
                       // Now traverse forward from the evolution start to collect all Pokemon in this line
-                      for (let checkId = evolutionStart; checkId <= 151; checkId++) {
+                      for (let checkId = evolutionStart; checkId <= 176; checkId++) {
                         const pokemon = getPokemonById(checkId);
                         if (!pokemon) continue;
                         
