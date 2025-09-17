@@ -10,10 +10,10 @@ A nice website to showcase custom Pokemon artwork with statistics tracking.
 ## Features
 
 ### Home Page - Pokedex
-- Grid layout showing all 151 Pokemon slots (like a Pokedex)
+- Dynamic grid layout that grows as Pokemon are added
 - Interactive hover effects that show large preview images
 - Shows which slots have custom artwork vs empty slots
-- Progress tracking (X/151 Pokemon completed)
+- Progress tracking (X/Y Pokemon completed, where Y grows dynamically)
 
 ### Statistics Page
 - Overview cards showing total stats

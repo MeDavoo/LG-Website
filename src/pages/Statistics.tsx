@@ -85,7 +85,10 @@ const Statistics = () => {
 
   // Calculate statistics
   const totalPokemon = pokemonData.length;
-  const totalSlots = 176;
+  // Calculate total slots dynamically based on highest pokedex number
+  const totalSlots = pokemonData.length > 0 
+    ? Math.max(...pokemonData.map(p => p.pokedexNumber || 0), 151) // Minimum 151 for classic feel
+    : 151;
   const completionPercentage = Math.round((totalPokemon / totalSlots) * 100);
 
   // Type distribution for all Pokemon
@@ -355,7 +358,7 @@ const Statistics = () => {
           </div>
           <div className="text-3xl font-bold text-white mb-1">{totalPokemon}</div>
           <div className="text-white/70 text-sm">Completed Artwork</div>
-          <div className="text-white/50 text-xs">{completionPercentage}% of 176 slots</div>
+          <div className="text-white/50 text-xs">{completionPercentage}% of {totalSlots} slots</div>
         </div>
 
         <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">

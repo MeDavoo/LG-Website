@@ -14,7 +14,7 @@ import { CLOUDINARY_CONFIG } from '../config/cloudinary';
 
 export interface Pokemon {
   id: string; // Firebase document ID
-  pokedexNumber: number; // 1-151 position in Pokedex
+  pokedexNumber: number; // Dynamic position in Pokedex (grows as needed)
   name: string;
   artist: string;
   imageUrl: string;
@@ -71,8 +71,8 @@ export const uploadPokemonImage = async (file: File, pokemonName: string): Promi
   }
 };
 
-// Get the next available Pokedex number (fills gaps first, then continues sequentially)
-export const getNextPokedexNumber = async (): Promise<number> => {
+// Get the next available Pokedex number (handles legendary placement)
+export const getNextPokedexNumber = async (isLegendary: boolean = false): Promise<number> => {
   try {
     const q = query(collection(db, COLLECTION_NAME), orderBy('pokedexNumber'));
     const querySnapshot = await getDocs(q);
@@ -81,21 +81,103 @@ export const getNextPokedexNumber = async (): Promise<number> => {
       return 1;
     }
     
-    // Get all existing pokedex numbers
-    const existingNumbers = querySnapshot.docs.map(doc => doc.data().pokedexNumber);
+    // Get all existing Pokemon data
+    const allPokemon = querySnapshot.docs.map(doc => ({
+      pokedexNumber: doc.data().pokedexNumber,
+      evolutionStage: doc.data().evolutionStage
+    }));
     
-    // Find the first gap in the sequence (1-176)
-    for (let i = 1; i <= 176; i++) {
-      if (!existingNumbers.includes(i)) {
-        return i;
+    const existingNumbers = allPokemon.map(p => p.pokedexNumber);
+    const regularPokemon = allPokemon.filter(p => p.evolutionStage !== 4);
+    
+    if (isLegendary) {
+      // For legendaries, find the next available slot after all regular Pokemon
+      const maxRegularNumber = regularPokemon.length > 0 
+        ? Math.max(...regularPokemon.map(p => p.pokedexNumber))
+        : 0;
+      
+      // Place legendary after all regular Pokemon
+      for (let i = maxRegularNumber + 1; ; i++) {
+        if (!existingNumbers.includes(i)) {
+          return i;
+        }
+      }
+    } else {
+      // For regular Pokemon, ensure they are placed BEFORE any legendary Pokemon
+      const legendaryPokemon = allPokemon.filter(p => p.evolutionStage === 4);
+      
+      if (legendaryPokemon.length === 0) {
+        // No legendaries exist, find the first available slot
+        const maxNumber = Math.max(...existingNumbers);
+        for (let i = 1; i <= maxNumber + 1; i++) {
+          if (!existingNumbers.includes(i)) {
+            return i;
+          }
+        }
+        return maxNumber + 1;
+      } else {
+        // Legendaries exist, find the first available slot BEFORE the first legendary
+        const minLegendaryNumber = Math.min(...legendaryPokemon.map(p => p.pokedexNumber));
+        
+        // Look for gaps before legendaries
+        for (let i = 1; i < minLegendaryNumber; i++) {
+          if (!existingNumbers.includes(i)) {
+            return i;
+          }
+        }
+        
+        // No gaps found before legendaries, we need to shift legendaries to make room
+        // Return the position where the first legendary is, which will trigger a reorganization
+        return minLegendaryNumber;
       }
     }
-    
-    // If all slots 1-176 are filled, this shouldn't happen but return 152 as fallback
-    return 177;
   } catch (error) {
     console.error('Error getting next Pokedex number:', error);
     return 1;
+  }
+};
+
+// Reorganize all Pokemon to ensure legendaries are at the bottom
+export const reorganizePokedex = async (): Promise<void> => {
+  try {
+    const allPokemon = await getAllPokemon();
+    
+    // Separate regular and legendary Pokemon
+    const regularPokemon = allPokemon.filter(p => p.evolutionStage !== 4);
+    const legendaryPokemon = allPokemon.filter(p => p.evolutionStage === 4);
+    
+    // Sort regular Pokemon by current pokedex number
+    regularPokemon.sort((a, b) => (a.pokedexNumber || 0) - (b.pokedexNumber || 0));
+    
+    // Sort legendary Pokemon by current pokedex number
+    legendaryPokemon.sort((a, b) => (a.pokedexNumber || 0) - (b.pokedexNumber || 0));
+    
+    // Batch update all Pokemon with new numbers
+    const batch = [];
+    
+    // Assign numbers 1, 2, 3... to regular Pokemon
+    for (let i = 0; i < regularPokemon.length; i++) {
+      const pokemon = regularPokemon[i];
+      const newNumber = i + 1;
+      if (pokemon.pokedexNumber !== newNumber) {
+        batch.push(updatePokemon(pokemon.id, { pokedexNumber: newNumber }));
+      }
+    }
+    
+    // Assign numbers after regular Pokemon to legendaries
+    for (let i = 0; i < legendaryPokemon.length; i++) {
+      const pokemon = legendaryPokemon[i];
+      const newNumber = regularPokemon.length + i + 1;
+      if (pokemon.pokedexNumber !== newNumber) {
+        batch.push(updatePokemon(pokemon.id, { pokedexNumber: newNumber }));
+      }
+    }
+    
+    // Execute all updates
+    await Promise.all(batch);
+    console.log('Pokedex reorganized successfully');
+  } catch (error) {
+    console.error('Error reorganizing Pokedex:', error);
   }
 };
 

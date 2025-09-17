@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber, saveRating, getAllRatings, getGlobalRankings } from '../services/pokemonService';
+import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber, saveRating, getAllRatings, getGlobalRankings, reorganizePokedex } from '../services/pokemonService';
 import Navbar from '../components/Navbar';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 
@@ -25,7 +25,7 @@ const Home = () => {
   const [_pokemonData, setPokemonData] = useState<Pokemon[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Create 176 Pokemon slots (like a Pokedex) from Firebase data
+  // Create Pokemon slots dynamically based on Firebase data
   const [pokemonSlots, setPokemonSlots] = useState<PokemonSlot[]>([]);
 
   // Animation timing system
@@ -61,9 +61,13 @@ const Home = () => {
       const firebasePokemon = await getAllPokemon();
       setPokemonData(firebasePokemon);
       
-      // Create 176 slots and populate with Firebase data
+      // Create slots dynamically based on the highest pokedex number or Pokemon count
+      const maxPokedexNumber = firebasePokemon.length > 0 
+        ? Math.max(...firebasePokemon.map(p => p.pokedexNumber || 0))
+        : 151; // Start with 151 as minimum for classic Pokedex feel
+      
       const slots: PokemonSlot[] = [];
-      for (let i = 1; i <= 176; i++) {
+      for (let i = 1; i <= maxPokedexNumber; i++) {
         const pokemonFromFirebase = firebasePokemon.find(p => p.pokedexNumber === i);
         
         if (pokemonFromFirebase) {
@@ -159,6 +163,7 @@ const Home = () => {
         showNotification(`${selectedPokemon.name} has been deleted successfully!`, 'success');
         setSelectedPokemon(null);
         setShowDeleteConfirm(false);
+        await reorganizePokedex(); // Renumber all Pokemon and remove empty slot
         await loadPokemonData(); // Refresh the data
       } else {
         showNotification('❌ Failed to delete Pokemon. Please try again.', 'error');
@@ -290,8 +295,9 @@ const Home = () => {
         return;
       }
 
-      // Get next Pokedex number
-      const pokedexNumber = await getNextPokedexNumber();
+      // Get next Pokedex number (pass true if this is a legendary)
+      const isLegendary = addFormData.evolutionStage === 4;
+      const pokedexNumber = await getNextPokedexNumber(isLegendary);
 
       // Add Pokemon to database
       const pokemonData = {
@@ -318,6 +324,9 @@ const Home = () => {
         evolutionStage: 0,
         image: null
       });
+      
+      // Reorganize Pokedex to ensure proper ordering (legendaries at bottom)
+      await reorganizePokedex();
       
       await loadPokemonData(); // Refresh the data
     } catch (error) {
@@ -1514,7 +1523,7 @@ const Home = () => {
                   </h2>
                   {!isPositionEditorMode && (
                     <div className="text-white/60 text-sm mb-2">
-                      <span className="text-yellow-300 font-bold">{sortedPokemon.filter(p => p.hasArt).length}</span> / 176 Pokemon Found
+                      <span className="text-yellow-300 font-bold">{sortedPokemon.filter(p => p.hasArt).length}</span> / {pokemonSlots.length} Pokemon Found
                       {hasActiveFilters && (
                         <span className="ml-2 text-blue-300">
                           ({sortedPokemon.length} filtered)
@@ -1992,6 +2001,11 @@ const Home = () => {
                         const pokemon = getPokemonById(checkId);
                         if (!pokemon) continue;
                         
+                        // Skip legendaries - they are not part of evolution lines
+                        if (pokemon.evolutionStage === 4) {
+                          continue;
+                        }
+                        
                         // If we find Stage 0, check if it's part of the same evolution line
                         if (pokemon.evolutionStage === 0) {
                           // If this Stage 0 Pokemon doesn't evolve (U0), it's a different evolution line
@@ -2019,9 +2033,14 @@ const Home = () => {
                       }
                       
                       // Now traverse forward from the evolution start to collect all Pokemon in this line
-                      for (let checkId = evolutionStart; checkId <= 176; checkId++) {
+                      for (let checkId = evolutionStart; checkId <= pokemonSlots.length; checkId++) {
                         const pokemon = getPokemonById(checkId);
                         if (!pokemon) continue;
+                        
+                        // Skip legendaries - they are not part of evolution lines
+                        if (pokemon.evolutionStage === 4) {
+                          continue;
+                        }
                         
                         // Special case: If this is a Stage 0 Pokemon that doesn't evolve (U0), 
                         // only include it if it's the current Pokemon or we're at the start
@@ -2041,6 +2060,11 @@ const Home = () => {
                         // Check what's next
                         const nextPokemon = getPokemonById(checkId + 1);
                         if (!nextPokemon) break;
+                        
+                        // STOPPING RULE: If next Pokemon is a legendary, we've reached the end of this evolution line
+                        if (nextPokemon.evolutionStage === 4) {
+                          break;
+                        }
                         
                         // STOPPING RULE: If next Pokemon is Stage 0 and doesn't evolve, we've reached a new evolution line
                         if (nextPokemon.evolutionStage === 0 && nextPokemon.unique === 'U0') {
