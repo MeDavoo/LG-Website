@@ -84,15 +84,15 @@ export const getNextPokedexNumber = async (): Promise<number> => {
     // Get all existing pokedex numbers
     const existingNumbers = querySnapshot.docs.map(doc => doc.data().pokedexNumber);
     
-    // Find the first gap in the sequence (1-151)
-    for (let i = 1; i <= 151; i++) {
+    // Find the first gap in the sequence (1-176)
+    for (let i = 1; i <= 176; i++) {
       if (!existingNumbers.includes(i)) {
         return i;
       }
     }
     
-    // If all slots 1-151 are filled, this shouldn't happen but return 152 as fallback
-    return 152;
+    // If all slots 1-176 are filled, this shouldn't happen but return 152 as fallback
+    return 177;
   } catch (error) {
     console.error('Error getting next Pokedex number:', error);
     return 1;

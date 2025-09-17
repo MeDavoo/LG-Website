@@ -355,7 +355,7 @@ const Statistics = () => {
           </div>
           <div className="text-3xl font-bold text-white mb-1">{totalPokemon}</div>
           <div className="text-white/70 text-sm">Completed Artwork</div>
-          <div className="text-white/50 text-xs">{completionPercentage}% of 151 slots</div>
+          <div className="text-white/50 text-xs">{completionPercentage}% of 176 slots</div>
         </div>
 
         <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
