@@ -1630,7 +1630,9 @@ const Home = () => {
                                 selectedPokemon?.id === pokemon.id
                                   ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
                                   : pokemon.hasArt 
-                                  ? 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40' 
+                                  ? (pokemon.evolutionStage === 4 
+                                    ? 'bg-orange-200/10 border-orange-300/20 hover:bg-orange-200/20 hover:border-orange-300/30' 
+                                    : 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40')
                                   : 'bg-white/5 border-white/10 hover:bg-white/10'
                               }`
                         } ${isDragging && draggedPokemon?.id === pokemon.id ? 'opacity-50 scale-95' : ''}`}
