@@ -525,6 +525,33 @@ const Statistics = () => {
                         }
                       }
                     },
+                    {
+                      label: 'Trend Line',
+                      data: (() => {
+                        // Calculate trend line using moving average
+                        const windowSize = Math.max(5, Math.floor(chartData.slice(1).length / 10)); // Adaptive window size
+                        const trendData = [];
+                        const data = chartData.slice(1);
+                        
+                        for (let i = 0; i < data.length; i++) {
+                          const start = Math.max(0, i - Math.floor(windowSize / 2));
+                          const end = Math.min(data.length, i + Math.floor(windowSize / 2) + 1);
+                          const window = data.slice(start, end);
+                          const average = window.reduce((sum, val) => sum + val, 0) / window.length;
+                          trendData.push(average);
+                        }
+                        
+                        return trendData;
+                      })(),
+                      borderColor: 'rgba(255, 215, 0, 0.9)', // Gold color
+                      backgroundColor: 'transparent',
+                      borderWidth: 4,
+                      fill: false,
+                      tension: 0.4,
+                      pointRadius: 0, // Hide points on trend line
+                      pointHoverRadius: 0,
+                      borderDash: [5, 5], // Dashed line
+                    },
                   ],
                 }}
                 options={{
@@ -537,6 +564,19 @@ const Statistics = () => {
                   plugins: {
                     legend: {
                       display: false,
+                      labels: {
+                        color: 'white',
+                        generateLabels: function() {
+                          // Custom label for trend line only
+                          return [{
+                            text: 'Overall Trend',
+                            fillStyle: 'rgba(255, 215, 0, 0.9)',
+                            strokeStyle: 'rgba(255, 215, 0, 0.9)',
+                            lineWidth: 4,
+                            lineDash: [5, 5],
+                          }];
+                        },
+                      },
                     },
                     tooltip: {
                       callbacks: {
