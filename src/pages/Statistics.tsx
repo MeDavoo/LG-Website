@@ -43,6 +43,9 @@ const Statistics = () => {
   const [globalRankings, setGlobalRankings] = useState<{ pokemonId: string; rank: number; totalPoints: number }[]>([]);
   const [pokemonRatings, setPokemonRatings] = useState<{ [pokemonId: string]: PokemonRating }>({});
   const [selectedArtist, setSelectedArtist] = useState<string>(''); // New state for selected artist tab
+  const [activePerformanceTab, setActivePerformanceTab] = useState<'artist' | 'global'>('artist'); // State for performance chart tabs
+  const [globalRankingsFilter, setGlobalRankingsFilter] = useState<'all' | 'half' | 'quarter' | 'eighth'>('all'); // State for global rankings filter
+  const [globalRankingsView, setGlobalRankingsView] = useState<'single' | 'evolution'>('single'); // State for single vs evolution line view
 
   useEffect(() => {
     loadPokemonData();
@@ -85,11 +88,6 @@ const Statistics = () => {
 
   // Calculate statistics
   const totalPokemon = pokemonData.length;
-  // Calculate total slots dynamically based on highest pokedex number
-  const totalSlots = pokemonData.length > 0 
-    ? Math.max(...pokemonData.map(p => p.pokedexNumber || 0), 151) // Minimum 151 for classic feel
-    : 151;
-  const completionPercentage = Math.round((totalPokemon / totalSlots) * 100);
 
   // Type distribution for all Pokemon
   const typeCount: { [key: string]: number } = {};
@@ -184,6 +182,180 @@ const Statistics = () => {
   const getGlobalRank = (pokemonId: string): number | null => {
     const globalRanking = globalRankings.find(r => r.pokemonId === pokemonId);
     return globalRanking ? globalRanking.rank : null;
+  };
+
+  // Helper function to group Pokemon by evolution lines (using the same algorithm as Home page)
+  const groupPokemonByEvolutionLines = (pokemon: Pokemon[]) => {
+    const evolutionLines: Pokemon[][] = [];
+    const processedIds = new Set<string>();
+    
+    // Sort Pokemon by pokedex number to ensure proper ordering
+    const sortedPokemon = [...pokemon].sort((a, b) => a.pokedexNumber - b.pokedexNumber);
+    
+    // Helper function to get Pokemon by pokedex number
+    const getPokemonByNumber = (pokedexNumber: number) => 
+      sortedPokemon.find(p => p.pokedexNumber === pokedexNumber && p.evolutionStage !== undefined);
+    
+    sortedPokemon.forEach(currentPokemon => {
+      // Skip if already processed or is legendary
+      if (processedIds.has(currentPokemon.id) || currentPokemon.evolutionStage === 4) {
+        return;
+      }
+      
+      const currentId = currentPokemon.pokedexNumber;
+      const currentStage = currentPokemon.evolutionStage;
+      
+      const evolutionLine: Pokemon[] = [];
+      const addedIds = new Set<number>();
+      
+      // Helper function to safely add Pokemon (prevents duplicates)
+      const safeAddPokemon = (pkmn: Pokemon | undefined) => {
+        if (pkmn && !addedIds.has(pkmn.pokedexNumber)) {
+          evolutionLine.push(pkmn);
+          addedIds.add(pkmn.pokedexNumber);
+          processedIds.add(pkmn.id);
+        }
+      };
+      
+      // Find the start of the evolution line (Stage 0)
+      let evolutionStart = currentId;
+      
+      // Search backwards to find Stage 0 or the start of this evolution line
+      for (let checkId = currentId - 1; checkId >= 1; checkId--) {
+        const pokemon = getPokemonByNumber(checkId);
+        if (!pokemon) continue;
+        
+        // Skip legendaries
+        if (pokemon.evolutionStage === 4) {
+          continue;
+        }
+        
+        // If we find Stage 0, check if it's part of the same evolution line
+        if (pokemon.evolutionStage === 0) {
+          // If this Stage 0 Pokemon doesn't evolve (U0), it's a different evolution line
+          if (pokemon.unique === 'U0') {
+            break; // Stop here, don't include this Stage 0
+          }
+          // Otherwise, this Stage 0 is part of our evolution line
+          evolutionStart = checkId;
+          break;
+        }
+        
+        // If we find a lower stage, continue searching backwards
+        if (pokemon.evolutionStage !== undefined && currentStage !== undefined && 
+            pokemon.evolutionStage < currentStage) {
+          continue;
+        }
+        
+        // If we find the same stage (branching evolution), continue searching
+        if (pokemon.evolutionStage === currentStage) {
+          continue;
+        }
+        
+        // If we find a higher stage or reach the limit, stop
+        break;
+      }
+      
+      // Now traverse forward from the evolution start to collect all Pokemon in this line
+      for (let checkId = evolutionStart; checkId <= Math.max(...sortedPokemon.map(p => p.pokedexNumber)); checkId++) {
+        const pokemon = getPokemonByNumber(checkId);
+        if (!pokemon) continue;
+        
+        // Skip legendaries
+        if (pokemon.evolutionStage === 4) {
+          continue;
+        }
+        
+        // Special case: If this is a Stage 0 Pokemon that doesn't evolve (U0), 
+        // only include it if it's the current Pokemon or we're at the start
+        if (pokemon.evolutionStage === 0 && pokemon.unique === 'U0' && checkId !== currentId && checkId !== evolutionStart) {
+          // This is a different non-evolving Stage 0, skip it
+          break;
+        }
+        
+        // Add this Pokemon to the evolution line
+        safeAddPokemon(pokemon);
+        
+        // If this is a Stage 0 that doesn't evolve, and it's not the current Pokemon, stop here
+        if (pokemon.evolutionStage === 0 && pokemon.unique === 'U0' && checkId !== currentId) {
+          break;
+        }
+        
+        // Check what's next
+        const nextPokemon = getPokemonByNumber(checkId + 1);
+        if (!nextPokemon) break;
+        
+        // STOPPING RULE: If next Pokemon is a legendary, we've reached the end of this evolution line
+        if (nextPokemon.evolutionStage === 4) {
+          break;
+        }
+        
+        // STOPPING RULE: If next Pokemon is Stage 0 and doesn't evolve, we've reached a new evolution line
+        if (nextPokemon.evolutionStage === 0 && nextPokemon.unique === 'U0') {
+          break;
+        }
+        
+        // STOPPING RULE: If next Pokemon is Stage 0 and we already have Stage 0 in our line, new evolution line
+        if (nextPokemon.evolutionStage === 0 && evolutionLine.some(p => p.evolutionStage === 0)) {
+          break;
+        }
+        
+        // Continue if:
+        // 1. Next stage is higher (normal evolution: 0->1, 1->2)
+        // 2. Next stage is same (branching evolution: 1->1, 2->2)
+        // 3. Next stage is special (MEGA=5, GMAX=3)
+        if ((nextPokemon.evolutionStage !== undefined && pokemon.evolutionStage !== undefined) &&
+            (nextPokemon.evolutionStage > pokemon.evolutionStage || 
+             nextPokemon.evolutionStage === pokemon.evolutionStage ||
+             nextPokemon.evolutionStage === 5 || 
+             nextPokemon.evolutionStage === 3)) {
+          continue;
+        }
+        
+        // If none of the above, we've reached the end of this evolution line
+        break;
+      }
+      
+      // Only add evolution lines with at least one Pokemon
+      if (evolutionLine.length > 0) {
+        // Sort Pokemon in the line by evolution stage, then by pokedex number
+        evolutionLine.sort((a, b) => {
+          if (a.evolutionStage !== b.evolutionStage) {
+            return (a.evolutionStage || 0) - (b.evolutionStage || 0);
+          }
+          return a.pokedexNumber - b.pokedexNumber;
+        });
+        
+        evolutionLines.push(evolutionLine);
+      }
+    });
+    
+    // Convert to the expected format and calculate combined stats for each evolution line
+    return evolutionLines.map(pokemonInLine => {
+      // Calculate combined ranking (average of all Pokemon in the line)
+      const rankings = pokemonInLine
+        .map(p => getGlobalRank(p.id))
+        .filter(rank => rank !== null && rank > 0) as number[];
+      
+      const averageRank = rankings.length > 0 
+        ? rankings.reduce((sum, rank) => sum + rank, 0) / rankings.length
+        : null; // Use null instead of 999 to indicate no ranking
+      
+      // Use the earliest Pokemon in the line for display info
+      const representativePokemon = pokemonInLine[0];
+      
+      return {
+        baseKey: representativePokemon.id, // Use Pokemon ID as unique key
+        pokemon: pokemonInLine,
+        representativePokemon,
+        averageRank,
+        totalPokemon: pokemonInLine.length,
+        pokedexNumber: representativePokemon.pokedexNumber,
+        name: pokemonInLine.length > 1 
+          ? `${representativePokemon.name} Line` 
+          : representativePokemon.name
+      };
+    }).sort((a, b) => a.pokedexNumber - b.pokedexNumber);
   };
 
   // Get suggestions for an artist based on their type distribution
@@ -364,36 +536,43 @@ const Statistics = () => {
 
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-blue-500/20 rounded-lg">
-              <Image className="text-blue-400" size={24} />
+        <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
+          <div className="flex items-center space-x-4">
+            <div className="p-2 bg-blue-500/20 rounded-lg flex-shrink-0">
+              <Image className="text-blue-400" size={20} />
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="text-2xl font-bold text-white">{totalPokemon}</div>
+              <div className="text-white/70 text-sm">Completed Artwork</div>
             </div>
           </div>
-          <div className="text-3xl font-bold text-white mb-1">{totalPokemon}</div>
-          <div className="text-white/70 text-sm">Completed Artwork</div>
-          <div className="text-white/50 text-xs">{completionPercentage}% of {totalSlots} slots</div>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-green-500/20 rounded-lg">
-              <Users className="text-green-400" size={24} />
+        <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
+          <div className="flex items-center space-x-4">
+            <div className="p-2 bg-green-500/20 rounded-lg flex-shrink-0">
+              <Users className="text-green-400" size={20} />
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="text-2xl font-bold text-white">{Object.keys(artistCount).length}</div>
+              <div className="text-white/70 text-sm">Active Artists</div>
             </div>
           </div>
-          <div className="text-3xl font-bold text-white mb-1">{Object.keys(artistCount).length}</div>
-          <div className="text-white/70 text-sm">Active Artists</div>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-purple-500/20 rounded-lg">
-              <Palette className="text-purple-400" size={24} />
+        <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
+          <div className="flex items-center space-x-4">
+            <div className="p-2 bg-purple-500/20 rounded-lg flex-shrink-0">
+              <Palette className="text-purple-400" size={20} />
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="text-2xl font-bold text-white">{uniquePokemonCount}</div>
+              <div className="text-white/70 text-sm">
+                <div>Unique Pokemon</div>
+                <div className="text-white/50 text-xs">Baseless Creations (U0/U1/U2)</div>
+              </div>
             </div>
           </div>
-          <div className="text-3xl font-bold text-white mb-1">{uniquePokemonCount}</div>
-          <div className="text-white/70 text-sm">Unique Pokemon</div>
-          <div className="text-white/50 text-xs">Baseless Creations (U0/U1/U2)</div>
         </div>
       </div>
 
@@ -451,220 +630,544 @@ const Statistics = () => {
       <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 mb-8">
         <h3 className="text-xl font-bold text-white mb-6 flex items-center">
           <Trophy className="mr-3 text-yellow-400" size={24} />
-          Global Pokemon Rankings Over Time
+          Global Pokemon Rankings Over Time (Excluding Legendaries)
         </h3>
+        
+        {/* Major View Tabs - Single vs Evolution Lines */}
+        <div className="flex gap-4 mb-6">
+          <button
+            onClick={() => setGlobalRankingsView('single')}
+            className={`px-6 py-3 rounded-lg transition-all duration-200 font-semibold flex items-center ${
+              globalRankingsView === 'single'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            Individual Pokemon
+          </button>
+          <button
+            onClick={() => setGlobalRankingsView('evolution')}
+            className={`px-6 py-3 rounded-lg transition-all duration-200 font-semibold flex items-center ${
+              globalRankingsView === 'evolution'
+                ? 'bg-purple-500 text-white shadow-lg'
+                : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            Evolution Lines
+          </button>
+        </div>
+        
+        {/* Global Rankings Filter Tabs */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            onClick={() => setGlobalRankingsFilter('all')}
+            className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium ${
+              globalRankingsFilter === 'all'
+                ? 'bg-yellow-400 text-black'
+                : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            All Pokemon
+            <span className="ml-2 text-xs opacity-70">(162)</span>
+          </button>
+          <button
+            onClick={() => setGlobalRankingsFilter('half')}
+            className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium ${
+              globalRankingsFilter === 'half'
+                ? 'bg-yellow-400 text-black'
+                : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            Recent Half
+            <span className="ml-2 text-xs opacity-70">(~81)</span>
+          </button>
+          <button
+            onClick={() => setGlobalRankingsFilter('quarter')}
+            className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium ${
+              globalRankingsFilter === 'quarter'
+                ? 'bg-yellow-400 text-black'
+                : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            Recent Quarter
+            <span className="ml-2 text-xs opacity-70">(~41)</span>
+          </button>
+          <button
+            onClick={() => setGlobalRankingsFilter('eighth')}
+            className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium ${
+              globalRankingsFilter === 'eighth'
+                ? 'bg-yellow-400 text-black'
+                : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            Recent Eighth
+            <span className="ml-2 text-xs opacity-70">(~20)</span>
+          </button>
+        </div>
+
         <div className="h-96">
           {(() => {
-            // Get all Pokemon sorted by Pokedex number
-            const sortedPokemon = [...pokemonData].sort((a, b) => a.pokedexNumber - b.pokedexNumber);
+            // Get all Pokemon sorted by Pokedex number, excluding legendaries (evolutionStage: 4)
+            const nonLegendaryPokemon = pokemonData.filter(pokemon => pokemon.evolutionStage !== 4);
             
-            // Calculate ranking changes for color coding
-            const rankingChanges: number[] = [];
-            let previousRank: number | null = null;
-            
-            const chartData = sortedPokemon.map((pokemon, index) => {
-              const globalRank = getGlobalRank(pokemon.id);
+            if (globalRankingsView === 'evolution') {
+              // Evolution Lines View
+              const evolutionLines = groupPokemonByEvolutionLines(nonLegendaryPokemon);
               
-              // Calculate change from previous Pokemon's rank (skip first Pokemon)
-              let change = 0;
-              if (index > 0 && previousRank !== null && globalRank !== null) {
-                change = previousRank - globalRank; // Positive = improvement (going up), Negative = decline (going down)
+              // Filter out evolution lines that have no rankings at all
+              const rankedLines = evolutionLines.filter(line => line.averageRank !== null);
+              
+              // Apply filtering based on selected filter
+              let filteredLines = rankedLines;
+              const totalCount = rankedLines.length;
+              
+              switch (globalRankingsFilter) {
+                case 'half':
+                  filteredLines = rankedLines.slice(Math.floor(totalCount / 2));
+                  break;
+                case 'quarter':
+                  filteredLines = rankedLines.slice(Math.floor(totalCount * 3 / 4));
+                  break;
+                case 'eighth':
+                  filteredLines = rankedLines.slice(Math.floor(totalCount * 7 / 8));
+                  break;
+                default: // 'all'
+                  filteredLines = rankedLines;
+                  break;
               }
-              rankingChanges.push(change);
-              previousRank = globalRank;
               
-              return globalRank || totalPokemon + 1;
-            });
+              // Calculate ranking changes for evolution lines
+              const rankingChanges: number[] = [];
+              let previousRank: number | null = null;
+              
+              const chartData = filteredLines.map((line, index) => {
+                const currentRank = line.averageRank!; // We know it's not null due to filtering
+                
+                // Calculate change from previous line's rank
+                let change = 0;
+                if (index > 0 && previousRank !== null) {
+                  change = previousRank - currentRank;
+                }
+                rankingChanges.push(change);
+                previousRank = currentRank;
+                
+                return currentRank;
+              });
 
-            return (
-              <Line 
-                data={{
-                  labels: sortedPokemon.slice(1).map(pokemon => `#${pokemon.pokedexNumber.toString().padStart(3, '0')} ${pokemon.name}`),
-                  datasets: [
-                    {
-                      label: 'Global Rank',
-                      data: chartData.slice(1),
-                      borderColor: (context) => {
-                        if (!context.parsed) return 'rgba(59, 130, 246, 1)';
-                        const index = context.dataIndex;
-                        // Since we sliced, index 0 is now the second Pokemon, but we want to treat it as blue
-                        if (index === 0) return 'rgba(59, 130, 246, 1)'; // First visible point is blue
-                        
-                        const change = rankingChanges[index + 1]; // Adjust for slice(1)
-                        if (change > 0) return 'rgba(34, 197, 94, 1)'; // Green for improvement (rank going up)
-                        if (change < 0) return 'rgba(239, 68, 68, 1)'; // Red for decline (rank going down)
-                        return 'rgba(156, 163, 175, 1)'; // Gray for no change
-                      },
-                      backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                      borderWidth: 3,
-                      fill: false,
-                      tension: 0.1,
-                      pointBackgroundColor: (context) => {
-                        if (!context.parsed) return 'rgba(59, 130, 246, 1)';
-                        const index = context.dataIndex;
-                        if (index === 0) return 'rgba(59, 130, 246, 1)'; // First visible point is blue
-                        
-                        const change = rankingChanges[index + 1]; // Adjust for slice(1)
-                        if (change > 0) return 'rgba(34, 197, 94, 1)'; // Green
-                        if (change < 0) return 'rgba(239, 68, 68, 1)'; // Red
-                        return 'rgba(156, 163, 175, 1)'; // Gray
-                      },
-                      pointBorderColor: '#ffffff',
-                      pointBorderWidth: 2,
-                      pointRadius: 4,
-                      pointHoverRadius: 6,
-                      segment: {
-                        borderColor: (ctx) => {
-                          const index = ctx.p1DataIndex;
-                          if (index === 0) return 'rgba(59, 130, 246, 1)'; // First visible segment is blue
+              return (
+                <Line 
+                  data={{
+                    labels: filteredLines.map(line => `#${line.pokedexNumber.toString().padStart(3, '0')} ${line.name}`),
+                    datasets: [
+                      {
+                        label: 'Evolution Line Rank',
+                        data: chartData,
+                        borderColor: (context) => {
+                          if (!context.parsed) return 'rgba(138, 43, 226, 1)'; // Purple default
+                          const index = context.dataIndex;
+                          if (index === 0) return 'rgba(138, 43, 226, 1)'; // Purple for first point
                           
-                          const change = rankingChanges[index + 1]; // Adjust for slice(1)
+                          const change = rankingChanges[index];
                           if (change > 0) return 'rgba(34, 197, 94, 1)'; // Green for improvement
                           if (change < 0) return 'rgba(239, 68, 68, 1)'; // Red for decline
                           return 'rgba(156, 163, 175, 1)'; // Gray for no change
-                        }
-                      }
-                    },
-                    {
-                      label: 'Trend Line',
-                      data: (() => {
-                        // Calculate trend line using moving average
-                        const windowSize = Math.max(5, Math.floor(chartData.slice(1).length / 10)); // Adaptive window size
-                        const trendData = [];
-                        const data = chartData.slice(1);
-                        
-                        for (let i = 0; i < data.length; i++) {
-                          const start = Math.max(0, i - Math.floor(windowSize / 2));
-                          const end = Math.min(data.length, i + Math.floor(windowSize / 2) + 1);
-                          const window = data.slice(start, end);
-                          const average = window.reduce((sum, val) => sum + val, 0) / window.length;
-                          trendData.push(average);
-                        }
-                        
-                        return trendData;
-                      })(),
-                      borderColor: 'rgba(255, 215, 0, 0.9)', // Gold color
-                      backgroundColor: 'transparent',
-                      borderWidth: 4,
-                      fill: false,
-                      tension: 0.4,
-                      pointRadius: 0, // Hide points on trend line
-                      pointHoverRadius: 0,
-                      borderDash: [5, 5], // Dashed line
-                    },
-                  ],
-                }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  interaction: {
-                    intersect: false,
-                    mode: 'index',
-                  },
-                  plugins: {
-                    legend: {
-                      display: false,
-                      labels: {
-                        color: 'white',
-                        generateLabels: function() {
-                          // Custom label for trend line only
-                          return [{
-                            text: 'Overall Trend',
-                            fillStyle: 'rgba(255, 215, 0, 0.9)',
-                            strokeStyle: 'rgba(255, 215, 0, 0.9)',
-                            lineWidth: 4,
-                            lineDash: [5, 5],
-                          }];
                         },
-                      },
-                    },
-                    tooltip: {
-                      callbacks: {
-                        title: (context: any) => {
-                          const index = context[0].dataIndex;
-                          const pokemon = sortedPokemon[index + 1]; // Adjust for slice(1)
-                          return `${pokemon.name} (#${pokemon.pokedexNumber.toString().padStart(3, '0')})`;
-                        },
-                        label: (context: any) => {
+                        backgroundColor: 'rgba(138, 43, 226, 0.1)',
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.1,
+                        pointBackgroundColor: (context) => {
+                          if (!context.parsed) return 'rgba(138, 43, 226, 1)';
                           const index = context.dataIndex;
-                          const pokemon = sortedPokemon[index + 1]; // Adjust for slice(1)
-                          const globalRank = context.parsed.y;
-                          const avgStars = formatAverageStars(pokemon.id);
+                          if (index === 0) return 'rgba(138, 43, 226, 1)';
                           
-                          const result = [
-                            `Global Rank: #${globalRank > totalPokemon ? 'Unranked' : globalRank}`,
-                            `Artist: ${pokemon.artist}`,
-                            `Average Rating: ${avgStars}`,
-                            `Types: ${pokemon.types.join(', ')}`
-                          ];
+                          const change = rankingChanges[index];
+                          if (change > 0) return 'rgba(34, 197, 94, 1)';
+                          if (change < 0) return 'rgba(239, 68, 68, 1)';
+                          return 'rgba(156, 163, 175, 1)';
+                        },
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        segment: {
+                          borderColor: (ctx) => {
+                            const index = ctx.p1DataIndex;
+                            if (index === 0) return 'rgba(138, 43, 226, 1)';
+                            
+                            const change = rankingChanges[index];
+                            if (change > 0) return 'rgba(34, 197, 94, 1)';
+                            if (change < 0) return 'rgba(239, 68, 68, 1)';
+                            return 'rgba(156, 163, 175, 1)';
+                          }
+                        }
+                      },
+                      {
+                        label: 'Trend Line',
+                        data: (() => {
+                          const windowSize = Math.max(3, Math.floor(chartData.length / 8));
+                          const trendData = [];
                           
-                          // Add ranking change info (index + 1 because we sliced)
-                          if (index >= 0) { // Now we always have a comparison since we start from second Pokemon
-                            const change = rankingChanges[index + 1];
-                            if (change > 0) {
-                              result.push(`📈 Improved by ${change} positions`);
-                            } else if (change < 0) {
-                              result.push(`📉 Declined by ${Math.abs(change)} positions`);
-                            } else {
-                              result.push(`➖ No change in ranking`);
-                            }
+                          for (let i = 0; i < chartData.length; i++) {
+                            const start = Math.max(0, i - Math.floor(windowSize / 2));
+                            const end = Math.min(chartData.length, i + Math.floor(windowSize / 2) + 1);
+                            const window = chartData.slice(start, end);
+                            const average = window.reduce((sum, val) => sum + val, 0) / window.length;
+                            trendData.push(average);
                           }
                           
-                          return result;
+                          return trendData;
+                        })(),
+                        borderColor: 'rgba(255, 215, 0, 0.9)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 4,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        borderDash: [5, 5],
+                      },
+                    ],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                      intersect: false,
+                      mode: 'index',
+                    },
+                    plugins: {
+                      legend: {
+                        display: false,
+                      },
+                      tooltip: {
+                        filter: function(tooltipItem: any) {
+                          return tooltipItem.datasetIndex === 0;
                         },
-                        afterLabel: () => {
-                          return `Out of ${totalPokemon} total Pokemon`;
+                        callbacks: {
+                          title: (context: any) => {
+                            const index = context[0].dataIndex;
+                            const line = filteredLines[index];
+                            return `${line.name} (#${line.pokedexNumber.toString().padStart(3, '0')})`;
+                          },
+                          label: (context: any) => {
+                            const index = context.dataIndex;
+                            const line = filteredLines[index];
+                            const avgRank = context.parsed.y;
+                            
+                            const result = [
+                              `Average Rank: #${Math.round(avgRank)}`,
+                              `Pokemon in Line: ${line.totalPokemon}`,
+                              `Artist: ${line.representativePokemon.artist}`,
+                              `Types: ${line.representativePokemon.types.join(', ')}`
+                            ];
+                            
+                            if (line.pokemon.length > 1) {
+                              result.push(`Includes: ${line.pokemon.map(p => p.name).join(', ')}`);
+                            }
+                            
+                            if (index > 0) {
+                              const change = rankingChanges[index];
+                              if (change > 0) {
+                                result.push(`Improved by ${Math.round(change)} positions`);
+                              } else if (change < 0) {
+                                result.push(`Declined by ${Math.round(Math.abs(change))} positions`);
+                              } else {
+                                result.push(`No change in ranking`);
+                              }
+                            }
+                            
+                            return result;
+                          },
+                          afterLabel: () => {
+                            return `Out of ${totalCount} evolution lines`;
+                          },
                         },
                       },
                     },
-                  },
-                  scales: {
-                    y: {
-                      reverse: true, // Lower ranks (better) appear higher on chart
-                      beginAtZero: false,
-                      max: totalPokemon,
-                      title: {
-                        display: true,
-                        text: 'Global Rank',
-                        color: 'white',
-                        font: {
-                          size: 14,
-                          weight: 'bold',
+                    scales: {
+                      y: {
+                        reverse: true,
+                        beginAtZero: false,
+                        max: Math.max(...chartData) + 5, // Add some padding above the highest rank
+                        title: {
+                          display: true,
+                          text: 'Average Evolution Line Rank',
+                          color: 'white',
+                          font: {
+                            size: 14,
+                            weight: 'bold',
+                          },
+                        },
+                        ticks: {
+                          color: 'white',
+                          stepSize: Math.ceil(Math.max(...chartData) / 5),
+                          callback: function(value) {
+                            return '#' + Math.round(Number(value));
+                          },
+                        },
+                        grid: {
+                          color: 'rgba(255, 255, 255, 0.1)',
+                          lineWidth: 1,
                         },
                       },
-                      ticks: {
-                        color: 'white',
-                        stepSize: Math.ceil(totalPokemon / 5), // Fewer ticks = fewer grid lines
-                        callback: function(value) {
-                          return '#' + value;
+                      x: {
+                        title: {
+                          display: true,
+                          text: `Evolution Lines (${globalRankingsFilter === 'all' ? 'All' : 'Recent'} - Pokedex Order)`,
+                          color: 'white',
+                          font: {
+                            size: 14,
+                            weight: 'bold',
+                          },
                         },
-                      },
-                      grid: {
-                        color: 'rgba(255, 255, 255, 0.1)', // More subtle grid lines
-                        lineWidth: 1,
+                        ticks: {
+                          display: false,
+                        },
+                        grid: {
+                          display: false,
+                        },
                       },
                     },
-                    x: {
-                      title: {
-                        display: true,
-                        text: 'Pokemon (Pokedex Order)',
-                        color: 'white',
-                        font: {
-                          size: 14,
-                          weight: 'bold',
+                  }}
+                />
+              );
+            } else {
+              // Individual Pokemon View (existing logic)
+              const sortedPokemon = [...nonLegendaryPokemon].sort((a, b) => a.pokedexNumber - b.pokedexNumber);
+              
+              // Filter out Pokemon that don't have global rankings
+              const rankedPokemon = sortedPokemon.filter(pokemon => getGlobalRank(pokemon.id) !== null);
+              
+              // Apply filtering based on selected filter
+              let filteredPokemon = rankedPokemon;
+              const totalCount = rankedPokemon.length;
+              
+              switch (globalRankingsFilter) {
+                case 'half':
+                  filteredPokemon = rankedPokemon.slice(Math.floor(totalCount / 2));
+                  break;
+                case 'quarter':
+                  filteredPokemon = rankedPokemon.slice(Math.floor(totalCount * 3 / 4));
+                  break;
+                case 'eighth':
+                  filteredPokemon = rankedPokemon.slice(Math.floor(totalCount * 7 / 8));
+                  break;
+                default: // 'all'
+                  filteredPokemon = rankedPokemon;
+                  break;
+              }
+              
+              // Calculate ranking changes for color coding (for the filtered set)
+              const rankingChanges: number[] = [];
+              let previousRank: number | null = null;
+              
+              const chartData = filteredPokemon.map((pokemon, index) => {
+                const globalRank = getGlobalRank(pokemon.id)!; // We know it's not null due to filtering
+                
+                // Calculate change from previous Pokemon's rank
+                let change = 0;
+                if (index > 0 && previousRank !== null) {
+                  change = previousRank - globalRank; // Positive = improvement (going up), Negative = decline (going down)
+                }
+                rankingChanges.push(change);
+                previousRank = globalRank;
+                
+                return globalRank;
+              });
+
+              return (
+                <Line 
+                  data={{
+                    labels: filteredPokemon.map(pokemon => `#${pokemon.pokedexNumber.toString().padStart(3, '0')} ${pokemon.name}`),
+                    datasets: [
+                      {
+                        label: 'Global Rank',
+                        data: chartData,
+                        borderColor: (context) => {
+                          if (!context.parsed) return 'rgba(59, 130, 246, 1)';
+                          const index = context.dataIndex;
+                          // First point in any filtered view is blue
+                          if (index === 0) return 'rgba(59, 130, 246, 1)';
+                          
+                          const change = rankingChanges[index];
+                          if (change > 0) return 'rgba(34, 197, 94, 1)'; // Green for improvement (rank going up)
+                          if (change < 0) return 'rgba(239, 68, 68, 1)'; // Red for decline (rank going down)
+                          return 'rgba(156, 163, 175, 1)'; // Gray for no change
+                        },
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.1,
+                        pointBackgroundColor: (context) => {
+                          if (!context.parsed) return 'rgba(59, 130, 246, 1)';
+                          const index = context.dataIndex;
+                          if (index === 0) return 'rgba(59, 130, 246, 1)'; // First point is blue
+                          
+                          const change = rankingChanges[index];
+                          if (change > 0) return 'rgba(34, 197, 94, 1)'; // Green
+                          if (change < 0) return 'rgba(239, 68, 68, 1)'; // Red
+                          return 'rgba(156, 163, 175, 1)'; // Gray
+                        },
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        segment: {
+                          borderColor: (ctx) => {
+                            const index = ctx.p1DataIndex;
+                            if (index === 0) return 'rgba(59, 130, 246, 1)'; // First segment is blue
+                            
+                            const change = rankingChanges[index];
+                            if (change > 0) return 'rgba(34, 197, 94, 1)'; // Green for improvement
+                            if (change < 0) return 'rgba(239, 68, 68, 1)'; // Red for decline
+                            return 'rgba(156, 163, 175, 1)'; // Gray for no change
+                          }
+                        }
+                      },
+                      {
+                        label: 'Trend Line',
+                        data: (() => {
+                          // Calculate trend line using moving average
+                          const windowSize = Math.max(3, Math.floor(chartData.length / 8)); // Adaptive window size based on filtered data
+                          const trendData = [];
+                          
+                          for (let i = 0; i < chartData.length; i++) {
+                            const start = Math.max(0, i - Math.floor(windowSize / 2));
+                            const end = Math.min(chartData.length, i + Math.floor(windowSize / 2) + 1);
+                            const window = chartData.slice(start, end);
+                            const average = window.reduce((sum, val) => sum + val, 0) / window.length;
+                            trendData.push(average);
+                          }
+                          
+                          return trendData;
+                        })(),
+                        borderColor: 'rgba(255, 215, 0, 0.9)', // Gold color
+                        backgroundColor: 'transparent',
+                        borderWidth: 4,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 0, // Hide points on trend line
+                        pointHoverRadius: 0,
+                        borderDash: [5, 5], // Dashed line
+                      },
+                    ],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                      intersect: false,
+                      mode: 'index',
+                    },
+                    plugins: {
+                      legend: {
+                        display: false,
+                        labels: {
+                          color: 'white',
+                          generateLabels: function() {
+                            return [{
+                              text: 'Overall Trend',
+                              fillStyle: 'rgba(255, 215, 0, 0.9)',
+                              strokeStyle: 'rgba(255, 215, 0, 0.9)',
+                              lineWidth: 4,
+                              lineDash: [5, 5],
+                            }];
+                          },
                         },
                       },
-                      ticks: {
-                        display: false, // Hide all x-axis labels
-                      },
-                      grid: {
-                        display: false, // Hide vertical grid lines completely
+                      tooltip: {
+                        filter: function(tooltipItem: any) {
+                          // Only show tooltip for the main dataset (Global Rank), not the trend line
+                          return tooltipItem.datasetIndex === 0;
+                        },
+                        callbacks: {
+                          title: (context: any) => {
+                            const index = context[0].dataIndex;
+                            const pokemon = filteredPokemon[index];
+                            return `${pokemon.name} (#${pokemon.pokedexNumber.toString().padStart(3, '0')})`;
+                          },
+                          label: (context: any) => {
+                            const index = context.dataIndex;
+                            const pokemon = filteredPokemon[index];
+                            const globalRank = context.parsed.y;
+                            const avgStars = formatAverageStars(pokemon.id);
+                            
+                            const result = [
+                              `Global Rank: #${globalRank > totalCount ? 'Unranked' : globalRank}`,
+                              `Artist: ${pokemon.artist}`,
+                              `Average Rating: ${avgStars}`,
+                              `Types: ${pokemon.types.join(', ')}`
+                            ];
+                            
+                            // Add ranking change info
+                            if (index > 0) {
+                              const change = rankingChanges[index];
+                              if (change > 0) {
+                                result.push(`Improved by ${change} positions`);
+                              } else if (change < 0) {
+                                result.push(`Declined by ${Math.abs(change)} positions`);
+                              } else {
+                                result.push(`No change in ranking`);
+                              }
+                            }
+                            
+                            return result;
+                          },
+                          afterLabel: () => {
+                            return `Out of ${totalCount} Pokemon`;
+                          },
+                        },
                       },
                     },
-                  },
-                }}
-              />
-            );
+                    scales: {
+                      y: {
+                        reverse: true, // Lower ranks (better) appear higher on chart
+                        beginAtZero: false,
+                        max: Math.max(...chartData) + 5, // Add some padding above the highest rank
+                        title: {
+                          display: true,
+                          text: 'Global Rank',
+                          color: 'white',
+                          font: {
+                            size: 14,
+                            weight: 'bold',
+                          },
+                        },
+                        ticks: {
+                          color: 'white',
+                          stepSize: Math.ceil(Math.max(...chartData) / 5), // Fewer ticks = fewer grid lines
+                          callback: function(value) {
+                            return '#' + Math.round(Number(value));
+                          },
+                        },
+                        grid: {
+                          color: 'rgba(255, 255, 255, 0.1)', // More subtle grid lines
+                          lineWidth: 1,
+                        },
+                      },
+                      x: {
+                        title: {
+                          display: true,
+                          text: `Pokemon (${globalRankingsFilter === 'all' ? 'All' : 'Recent'} - Pokedex Order)`,
+                          color: 'white',
+                          font: {
+                            size: 14,
+                            weight: 'bold',
+                          },
+                        },
+                        ticks: {
+                          display: false, // Hide all x-axis labels
+                        },
+                        grid: {
+                          display: false, // Hide vertical grid lines completely
+                        },
+                      },
+                    },
+                  }}
+                />
+              );
+            }
           })()}
         </div>
         
@@ -681,7 +1184,7 @@ const Statistics = () => {
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-4 h-1 bg-gray-400 rounded"></div>
-              <span className="text-gray-400 text-sm font-medium">➖ No Change</span>
+              <span className="text-gray-400 text-sm font-medium">No Change</span>
             </div>
           </div>
         </div>
@@ -996,142 +1499,51 @@ const Statistics = () => {
                     </div>
                   )}
                   
-                  {/* Artist Performance Over Time Line Chart */}
+                  {/* Performance Charts - Tabbed Interface */}
                   {artistRankings[stat.artist] && artistRankings[stat.artist].length > 1 && (
                     <div className="mt-6">
-                      <h5 className="text-white font-semibold mb-3 flex items-center">
-                        <TrendingUp className="mr-2 text-blue-400" size={16} />
-                        Performance Over Time ({artistRankings[stat.artist].length} Pokemon)
-                      </h5>
-                      <div className="bg-white/5 rounded-lg p-4">
-                        <div className="h-80">
-                          {(() => {
-                            // Sort Pokemon by their pokedexNumber to show chronological order
-                            const sortedByTime = [...artistRankings[stat.artist]].sort((a, b) => {
-                              return a.pokemon.pokedexNumber - b.pokemon.pokedexNumber;
-                            });
-                            
-                            // Find the rank of each Pokemon within this artist's collection
-                            const artistRanksMap = new Map();
-                            artistRankings[stat.artist].forEach((ranking, index) => {
-                              artistRanksMap.set(ranking.pokemonId, index + 1);
-                            });
-                            
-                            return (
-                              <Line 
-                                data={{
-                                  labels: sortedByTime.map(ranking => ranking.pokemon.name),
-                                  datasets: [
-                                    {
-                                      label: 'Artist Rank',
-                                      data: sortedByTime.map(ranking => artistRanksMap.get(ranking.pokemonId)),
-                                      borderColor: 'rgba(59, 130, 246, 1)',
-                                      backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                      borderWidth: 3,
-                                      fill: true,
-                                      tension: 0.4,
-                                      pointBackgroundColor: 'rgba(59, 130, 246, 1)',
-                                      pointBorderColor: '#ffffff',
-                                      pointBorderWidth: 2,
-                                      pointRadius: 6,
-                                      pointHoverRadius: 8,
-                                    },
-                                  ],
-                                }}
-                                options={{
-                                  responsive: true,
-                                  maintainAspectRatio: false,
-                                  plugins: {
-                                    legend: {
-                                      display: false,
-                                    },
-                                    tooltip: {
-                                      callbacks: {
-                                        title: (context: any) => {
-                                          const index = context[0].dataIndex;
-                                          const pokemon = sortedByTime[index].pokemon;
-                                          return `${pokemon.name} (#${pokemon.pokedexNumber.toString().padStart(3, '0')})`;
-                                        },
-                                        label: (context: any) => {
-                                          const rank = context.parsed.y;
-                                          const pokemon = sortedByTime[context.dataIndex];
-                                          const avgStars = formatAverageStars(pokemon.pokemonId);
-                                          const globalRank = getGlobalRank(pokemon.pokemonId);
-                                          return [
-                                            `Artist Rank: #${rank}`, 
-                                            `Global Rank: #${globalRank || 'N/A'}`,
-                                            `Average Rating: ${avgStars}`
-                                          ];
-                                        },
-                                        afterLabel: (context: any) => {
-                                          const pokemon = sortedByTime[context.dataIndex].pokemon;
-                                          return `Pokedex #${pokemon.pokedexNumber.toString().padStart(3, '0')}`;
-                                        },
-                                      },
-                                    },
-                                  },
-                                  scales: {
-                                    y: {
-                                      reverse: true, // Lower ranks (better) appear higher on chart
-                                      beginAtZero: false,
-                                      title: {
-                                        display: true,
-                                        text: 'Pokemon Rank',
-                                        color: 'white',
-                                        font: {
-                                          size: 12,
-                                        },
-                                      },
-                                      ticks: {
-                                        color: 'white',
-                                        stepSize: 1,
-                                        callback: function(value) {
-                                          return '#' + value;
-                                        },
-                                      },
-                                      grid: {
-                                        color: 'rgba(255, 255, 255, 0.2)',
-                                      },
-                                    },
-                                    x: {
-                                      title: {
-                                        display: true,
-                                        text: 'Pokemon Names (Chronological Order)',
-                                        color: 'white',
-                                        font: {
-                                          size: 12,
-                                        },
-                                      },
-                                      ticks: {
-                                        color: 'white',
-                                        font: {
-                                          size: 9,
-                                        },
-                                        maxRotation: 45,
-                                        minRotation: 45,
-                                      },
-                                      grid: {
-                                        color: 'rgba(255, 255, 255, 0.2)',
-                                      },
-                                    },
-                                  },
-                                }}
-                              />
-                            );
-                          })()}
-                        </div>
+                      {/* Performance Chart Tabs */}
+                      <div className="flex space-x-2 mb-4">
+                        <button
+                          onClick={() => setActivePerformanceTab('artist')}
+                          className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium flex items-center ${
+                            activePerformanceTab === 'artist'
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-white/10 text-white hover:bg-white/20'
+                          }`}
+                        >
+                          <TrendingUp className="mr-2" size={16} />
+                          Artist Performance
+                        </button>
+                        <button
+                          onClick={() => setActivePerformanceTab('global')}
+                          className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium flex items-center ${
+                            activePerformanceTab === 'global'
+                              ? 'bg-purple-500 text-white'
+                              : 'bg-white/10 text-white hover:bg-white/20'
+                          }`}
+                        >
+                          <Trophy className="mr-2" size={16} />
+                          Global Performance
+                        </button>
                       </div>
-                    </div>
-                  )}
-                  
-                  {/* Global Performance Line Chart */}
-                  {artistRankings[stat.artist] && artistRankings[stat.artist].length > 1 && (
-                    <div className="mt-6">
-                      <h5 className="text-white font-semibold mb-3 flex items-center">
-                        <Trophy className="mr-2 text-purple-400" size={16} />
-                        Global Performance Over Time ({artistRankings[stat.artist].length} Pokemon)
-                      </h5>
+
+                      {/* Chart Content */}
                       <div className="bg-white/5 rounded-lg p-4">
+                        <h5 className="text-white font-semibold mb-3 flex items-center">
+                          {activePerformanceTab === 'artist' ? (
+                            <>
+                              <TrendingUp className="mr-2 text-blue-400" size={16} />
+                              Artist Performance Over Time ({artistRankings[stat.artist].length} Pokemon)
+                            </>
+                          ) : (
+                            <>
+                              <Trophy className="mr-2 text-purple-400" size={16} />
+                              Global Performance Over Time ({artistRankings[stat.artist].length} Pokemon)
+                            </>
+                          )}
+                        </h5>
+                        
                         <div className="h-80">
                           {(() => {
                             // Sort Pokemon by their pokedexNumber to show chronological order
@@ -1139,111 +1551,198 @@ const Statistics = () => {
                               return a.pokemon.pokedexNumber - b.pokemon.pokedexNumber;
                             });
                             
-                            return (
-                              <Line 
-                                data={{
-                                  labels: sortedByTime.map(ranking => ranking.pokemon.name),
-                                  datasets: [
-                                    {
-                                      label: 'Global Rank',
-                                      data: sortedByTime.map(ranking => getGlobalRank(ranking.pokemonId) || totalPokemon + 1),
-                                      borderColor: 'rgba(168, 85, 247, 1)', // Purple color
-                                      backgroundColor: 'rgba(168, 85, 247, 0.1)',
-                                      borderWidth: 3,
-                                      fill: true,
-                                      tension: 0.4,
-                                      pointBackgroundColor: 'rgba(168, 85, 247, 1)',
-                                      pointBorderColor: '#ffffff',
-                                      pointBorderWidth: 2,
-                                      pointRadius: 6,
-                                      pointHoverRadius: 8,
-                                    },
-                                  ],
-                                }}
-                                options={{
-                                  responsive: true,
-                                  maintainAspectRatio: false,
-                                  plugins: {
-                                    legend: {
-                                      display: false,
-                                    },
-                                    tooltip: {
-                                      callbacks: {
-                                        title: (context: any) => {
-                                          const index = context[0].dataIndex;
-                                          const pokemon = sortedByTime[index].pokemon;
-                                          return `${pokemon.name} (#${pokemon.pokedexNumber.toString().padStart(3, '0')})`;
-                                        },
-                                        label: (context: any) => {
-                                          const globalRank = context.parsed.y;
-                                          const pokemonData = sortedByTime[context.dataIndex];
-                                          const avgStars = formatAverageStars(pokemonData.pokemonId);
-                                          const artistRanksMap = new Map();
-                                          artistRankings[stat.artist].forEach((ranking, index) => {
-                                            artistRanksMap.set(ranking.pokemonId, index + 1);
-                                          });
-                                          const artistRank = artistRanksMap.get(pokemonData.pokemonId);
-                                          return [
-                                            `Global Rank: #${globalRank > totalPokemon ? 'Unranked' : globalRank}`,
-                                            `Artist Rank: #${artistRank}`,
-                                            `Average Rating: ${avgStars}`
-                                          ];
-                                        },
-                                        afterLabel: () => {
-                                          return `Out of ${totalPokemon} total Pokemon`;
-                                        },
+                            if (activePerformanceTab === 'artist') {
+                              // Find the rank of each Pokemon within this artist's collection
+                              const artistRanksMap = new Map();
+                              artistRankings[stat.artist].forEach((ranking, index) => {
+                                artistRanksMap.set(ranking.pokemonId, index + 1);
+                              });
+                              
+                              return (
+                                <Line 
+                                  data={{
+                                    labels: sortedByTime.map(ranking => ranking.pokemon.name),
+                                    datasets: [
+                                      {
+                                        label: 'Artist Rank',
+                                        data: sortedByTime.map(ranking => artistRanksMap.get(ranking.pokemonId)),
+                                        borderColor: 'rgba(59, 130, 246, 1)',
+                                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                        borderWidth: 3,
+                                        fill: true,
+                                        tension: 0.4,
+                                        pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                                        pointBorderColor: '#ffffff',
+                                        pointBorderWidth: 2,
+                                        pointRadius: 6,
+                                        pointHoverRadius: 8,
                                       },
-                                    },
-                                  },
-                                  scales: {
-                                    y: {
-                                      reverse: true, // Lower ranks (better) appear higher on chart
-                                      beginAtZero: false,
-                                      max: totalPokemon,
-                                      title: {
-                                        display: true,
-                                        text: 'Global Rank (out of all Pokemon)',
-                                        color: 'white',
-                                        font: {
-                                          size: 12,
-                                        },
+                                    ],
+                                  }}
+                                  options={{
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                      legend: {
+                                        display: false,
                                       },
-                                      ticks: {
-                                        color: 'white',
-                                        stepSize: Math.ceil(totalPokemon / 10), // Divide into ~10 steps
-                                        callback: function(value) {
-                                          return '#' + value;
+                                      tooltip: {
+                                        callbacks: {
+                                          title: (context: any) => {
+                                            const index = context[0].dataIndex;
+                                            const pokemon = sortedByTime[index].pokemon;
+                                            return `${pokemon.name} (#${pokemon.pokedexNumber.toString().padStart(3, '0')})`;
+                                          },
+                                          label: (context: any) => {
+                                            const rank = context.parsed.y;
+                                            const pokemon = sortedByTime[context.dataIndex];
+                                            const avgStars = formatAverageStars(pokemon.pokemonId);
+                                            const globalRank = getGlobalRank(pokemon.pokemonId);
+                                            return [
+                                              `Artist Rank: #${rank}`, 
+                                              `Global Rank: #${globalRank || 'N/A'}`,
+                                              `Average Rating: ${avgStars}`
+                                            ];
+                                          },
+                                          afterLabel: (context: any) => {
+                                            const pokemon = sortedByTime[context.dataIndex].pokemon;
+                                            return `Pokedex #${pokemon.pokedexNumber.toString().padStart(3, '0')}`;
+                                          },
                                         },
-                                      },
-                                      grid: {
-                                        color: 'rgba(255, 255, 255, 0.2)',
                                       },
                                     },
-                                    x: {
-                                      title: {
-                                        display: true,
-                                        text: 'Pokemon Names (Chronological Order)',
-                                        color: 'white',
-                                        font: {
-                                          size: 12,
+                                    scales: {
+                                      y: {
+                                        reverse: true,
+                                        beginAtZero: false,
+                                        title: {
+                                          display: true,
+                                          text: 'Artist Rank',
+                                          color: 'white',
+                                          font: { size: 12 },
                                         },
-                                      },
-                                      ticks: {
-                                        color: 'white',
-                                        font: {
-                                          size: 9,
+                                        ticks: {
+                                          color: 'white',
+                                          stepSize: 1,
+                                          callback: function(value) { return '#' + value; },
                                         },
-                                        maxRotation: 45,
-                                        minRotation: 45,
+                                        grid: { color: 'rgba(255, 255, 255, 0.2)' },
                                       },
-                                      grid: {
-                                        color: 'rgba(255, 255, 255, 0.2)',
+                                      x: {
+                                        title: {
+                                          display: true,
+                                          text: 'Pokemon Names (Chronological Order)',
+                                          color: 'white',
+                                          font: { size: 12 },
+                                        },
+                                        ticks: {
+                                          color: 'white',
+                                          font: { size: 9 },
+                                          maxRotation: 45,
+                                          minRotation: 45,
+                                        },
+                                        grid: { color: 'rgba(255, 255, 255, 0.2)' },
                                       },
                                     },
-                                  },
-                                }}
-                              />
-                            );
+                                  }}
+                                />
+                              );
+                            } else {
+                              // Global Performance Chart
+                              return (
+                                <Line 
+                                  data={{
+                                    labels: sortedByTime.map(ranking => ranking.pokemon.name),
+                                    datasets: [
+                                      {
+                                        label: 'Global Rank',
+                                        data: sortedByTime.map(ranking => getGlobalRank(ranking.pokemonId) || totalPokemon + 1),
+                                        borderColor: 'rgba(168, 85, 247, 1)',
+                                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                                        borderWidth: 3,
+                                        fill: true,
+                                        tension: 0.4,
+                                        pointBackgroundColor: 'rgba(168, 85, 247, 1)',
+                                        pointBorderColor: '#ffffff',
+                                        pointBorderWidth: 2,
+                                        pointRadius: 6,
+                                        pointHoverRadius: 8,
+                                      },
+                                    ],
+                                  }}
+                                  options={{
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                      legend: {
+                                        display: false,
+                                      },
+                                      tooltip: {
+                                        callbacks: {
+                                          title: (context: any) => {
+                                            const index = context[0].dataIndex;
+                                            const pokemon = sortedByTime[index].pokemon;
+                                            return `${pokemon.name} (#${pokemon.pokedexNumber.toString().padStart(3, '0')})`;
+                                          },
+                                          label: (context: any) => {
+                                            const globalRank = context.parsed.y;
+                                            const pokemonData = sortedByTime[context.dataIndex];
+                                            const avgStars = formatAverageStars(pokemonData.pokemonId);
+                                            const artistRanksMap = new Map();
+                                            artistRankings[stat.artist].forEach((ranking, index) => {
+                                              artistRanksMap.set(ranking.pokemonId, index + 1);
+                                            });
+                                            const artistRank = artistRanksMap.get(pokemonData.pokemonId);
+                                            return [
+                                              `Global Rank: #${globalRank > totalPokemon ? 'Unranked' : globalRank}`,
+                                              `Artist Rank: #${artistRank}`,
+                                              `Average Rating: ${avgStars}`
+                                            ];
+                                          },
+                                          afterLabel: () => {
+                                            return `Out of ${totalPokemon} total Pokemon`;
+                                          },
+                                        },
+                                      },
+                                    },
+                                    scales: {
+                                      y: {
+                                        reverse: true,
+                                        beginAtZero: false,
+                                        max: totalPokemon,
+                                        title: {
+                                          display: true,
+                                          text: 'Global Rank (out of all Pokemon)',
+                                          color: 'white',
+                                          font: { size: 12 },
+                                        },
+                                        ticks: {
+                                          color: 'white',
+                                          stepSize: Math.ceil(totalPokemon / 10),
+                                          callback: function(value) { return '#' + value; },
+                                        },
+                                        grid: { color: 'rgba(255, 255, 255, 0.2)' },
+                                      },
+                                      x: {
+                                        title: {
+                                          display: true,
+                                          text: 'Pokemon Names (Chronological Order)',
+                                          color: 'white',
+                                          font: { size: 12 },
+                                        },
+                                        ticks: {
+                                          color: 'white',
+                                          font: { size: 9 },
+                                          maxRotation: 45,
+                                          minRotation: 45,
+                                        },
+                                        grid: { color: 'rgba(255, 255, 255, 0.2)' },
+                                      },
+                                    },
+                                  }}
+                                />
+                              );
+                            }
                           })()}
                         </div>
                       </div>
