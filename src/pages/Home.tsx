@@ -269,6 +269,11 @@ const Home = () => {
         } : null);
         
         await loadPokemonData(); // Refresh the data
+        
+        // Scroll to the updated Pokemon after a brief delay to ensure DOM is updated
+        setTimeout(() => {
+          scrollToPokemon(selectedPokemon.id);
+        }, 100);
       } else {
         showNotification('❌ Failed to update Pokemon. Please try again.', 'error');
       }
@@ -329,6 +334,11 @@ const Home = () => {
       await reorganizePokedex();
       
       await loadPokemonData(); // Refresh the data
+      
+      // Scroll to the newly added Pokemon after a brief delay to ensure DOM is updated
+      setTimeout(() => {
+        scrollToPokemon(pokedexNumber);
+      }, 100);
     } catch (error) {
       console.error('Error adding Pokemon:', error);
       showNotification('❌ Error adding Pokemon. Check console for details.', 'error');
@@ -712,6 +722,20 @@ const Home = () => {
       pokemonListRef.current.scrollTo({
         top: pokemonListRef.current.scrollHeight,
         behavior: instant ? 'auto' : 'smooth'
+      });
+    }
+  };
+
+  // Scroll to specific Pokemon in the list
+  const scrollToPokemon = (pokemonId: number, instant = false) => {
+    if (!pokemonListRef.current) return;
+    
+    // Find the Pokemon element by its data-pokemon-id attribute
+    const pokemonElement = pokemonListRef.current.querySelector(`[data-pokemon-id="${pokemonId}"]`);
+    if (pokemonElement) {
+      pokemonElement.scrollIntoView({
+        behavior: instant ? 'auto' : 'smooth',
+        block: 'center' // Center the Pokemon in the view
       });
     }
   };
@@ -1622,6 +1646,7 @@ const Home = () => {
                     <div key={pokemon.id} className={`flex items-center transition-all duration-300 ease-in-out ${showTiers ? 'gap-2' : 'gap-0'}`}>
                       {/* Pokemon List Item - Shrinks to make room for tier images */}
                       <div
+                        data-pokemon-id={pokemon.id}
                         draggable={isPositionEditorMode && pokemon.hasArt}
                         onDragStart={() => handleDragStart(pokemon)}
                         onDragOver={handleDragOver}
