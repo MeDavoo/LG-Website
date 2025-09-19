@@ -620,6 +620,9 @@ const Home = () => {
   const [imageTransform, setImageTransform] = useState({ rotateX: 0, rotateY: 0 });
   const imageRef = useRef<HTMLDivElement>(null);
 
+  // Pokemon list scroll ref
+  const pokemonListRef = useRef<HTMLDivElement>(null);
+
   // Rating System state
   const [hoveredStar, setHoveredStar] = useState(0);
   const [pokemonRatings, setPokemonRatings] = useState<{
@@ -701,6 +704,16 @@ const Home = () => {
 
   const handleMouseLeave = () => {
     setImageTransform({ rotateX: 0, rotateY: 0 });
+  };
+
+  // Scroll to bottom function
+  const scrollToBottom = (instant = false) => {
+    if (pokemonListRef.current) {
+      pokemonListRef.current.scrollTo({
+        top: pokemonListRef.current.scrollHeight,
+        behavior: instant ? 'auto' : 'smooth'
+      });
+    }
   };
 
   // Image switching functions for additional images
@@ -1603,7 +1616,7 @@ const Home = () => {
               )}
               
               {/* Pokemon List */}
-              <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/20 p-2 overflow-y-auto custom-scrollbar" style={{maxHeight: 'calc(100vh - 170px)'}}>
+              <div ref={pokemonListRef} className="bg-white/5 backdrop-blur-md rounded-xl border border-white/20 p-2 overflow-y-auto custom-scrollbar" style={{maxHeight: 'calc(100vh - 170px)'}}>
                 <div className="space-y-2">
                   {sortedPokemon.map((pokemon, index) => (
                     <div key={pokemon.id} className={`flex items-center transition-all duration-300 ease-in-out ${showTiers ? 'gap-2' : 'gap-0'}`}>
@@ -1766,6 +1779,24 @@ const Home = () => {
                     </div>
                   )}
                 </div>
+              </div>
+              
+              {/* Scroll to Bottom Button */}
+              <div className="flex justify-center mt-3">
+                <button
+                  onClick={() => scrollToBottom()}
+                  className="bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full p-3 border border-white/20 transition-all duration-300 hover:border-white/40 group"
+                  title="Scroll to bottom"
+                >
+                  <svg 
+                    className="w-5 h-5 text-white/70 group-hover:text-white transition-colors duration-300" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </button>
               </div>
             </div>
             
