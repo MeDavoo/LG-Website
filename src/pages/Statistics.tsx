@@ -105,6 +105,14 @@ const Statistics = () => {
     artistCount[p.artist] = (artistCount[p.artist] || 0) + 1;
   });
 
+  // Type count distribution (single vs dual type)
+  const singleTypeCount = pokemonData.filter(p => p.types.length === 1).length;
+  const dualTypeCount = pokemonData.filter(p => p.types.length === 2).length;
+  const typeCountDistribution = {
+    'Single Type': singleTypeCount,
+    'Dual Type': dualTypeCount
+  };
+
   // Count unique Pokemon (U0, U1, U2)
   const uniquePokemonCount = pokemonData.filter(p => p.unique && ['U0', 'U1', 'U2'].includes(p.unique)).length;
 
@@ -238,15 +246,21 @@ const Statistics = () => {
     ],
   };
 
-  // Artist contribution chart
-  const artistChartData = {
-    labels: Object.keys(artistCount),
+  // Type count distribution chart (single vs dual type)
+  const typeCountChartData = {
+    labels: Object.keys(typeCountDistribution),
     datasets: [
       {
-        label: 'Pokemon Created',
-        data: Object.values(artistCount),
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        borderColor: 'rgba(59, 130, 246, 1)',
+        label: 'Pokemon Count',
+        data: Object.values(typeCountDistribution),
+        backgroundColor: [
+          'rgba(34, 197, 94, 0.8)',   // Green for single type
+          'rgba(59, 130, 246, 0.8)',  // Blue for dual type
+        ],
+        borderColor: [
+          'rgba(34, 197, 94, 1)',
+          'rgba(59, 130, 246, 1)',
+        ],
         borderWidth: 2,
       },
     ],
@@ -416,11 +430,11 @@ const Statistics = () => {
           </div>
         </div>
 
-        {/* Artist Contributions - Takes 1/4 width (1 column) */}
+        {/* Type Count Distribution - Takes 1/4 width (1 column) */}
         <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
-          <h3 className="text-lg font-bold text-white mb-6">Artist Contributions</h3>
+          <h3 className="text-lg font-bold text-white mb-6">Single vs Dual Type</h3>
           <div className="h-80">
-            <Bar data={artistChartData} options={chartOptions} />
+            <Bar data={typeCountChartData} options={chartOptions} />
           </div>
         </div>
 
