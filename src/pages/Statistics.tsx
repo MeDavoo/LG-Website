@@ -447,6 +447,206 @@ const Statistics = () => {
         </div>
       </div>
 
+      {/* Global Rankings Line Chart */}
+      <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 mb-8">
+        <h3 className="text-xl font-bold text-white mb-6 flex items-center">
+          <Trophy className="mr-3 text-yellow-400" size={24} />
+          Global Pokemon Rankings Over Time
+        </h3>
+        <div className="h-96">
+          {(() => {
+            // Get all Pokemon sorted by Pokedex number
+            const sortedPokemon = [...pokemonData].sort((a, b) => a.pokedexNumber - b.pokedexNumber);
+            
+            // Calculate ranking changes for color coding
+            const rankingChanges: number[] = [];
+            let previousRank: number | null = null;
+            
+            const chartData = sortedPokemon.map((pokemon, index) => {
+              const globalRank = getGlobalRank(pokemon.id);
+              
+              // Calculate change from previous Pokemon's rank (skip first Pokemon)
+              let change = 0;
+              if (index > 0 && previousRank !== null && globalRank !== null) {
+                change = previousRank - globalRank; // Positive = improvement (going up), Negative = decline (going down)
+              }
+              rankingChanges.push(change);
+              previousRank = globalRank;
+              
+              return globalRank || totalPokemon + 1;
+            });
+
+            return (
+              <Line 
+                data={{
+                  labels: sortedPokemon.slice(1).map(pokemon => `#${pokemon.pokedexNumber.toString().padStart(3, '0')} ${pokemon.name}`),
+                  datasets: [
+                    {
+                      label: 'Global Rank',
+                      data: chartData.slice(1),
+                      borderColor: (context) => {
+                        if (!context.parsed) return 'rgba(59, 130, 246, 1)';
+                        const index = context.dataIndex;
+                        // Since we sliced, index 0 is now the second Pokemon, but we want to treat it as blue
+                        if (index === 0) return 'rgba(59, 130, 246, 1)'; // First visible point is blue
+                        
+                        const change = rankingChanges[index + 1]; // Adjust for slice(1)
+                        if (change > 0) return 'rgba(34, 197, 94, 1)'; // Green for improvement (rank going up)
+                        if (change < 0) return 'rgba(239, 68, 68, 1)'; // Red for decline (rank going down)
+                        return 'rgba(156, 163, 175, 1)'; // Gray for no change
+                      },
+                      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                      borderWidth: 3,
+                      fill: false,
+                      tension: 0.1,
+                      pointBackgroundColor: (context) => {
+                        if (!context.parsed) return 'rgba(59, 130, 246, 1)';
+                        const index = context.dataIndex;
+                        if (index === 0) return 'rgba(59, 130, 246, 1)'; // First visible point is blue
+                        
+                        const change = rankingChanges[index + 1]; // Adjust for slice(1)
+                        if (change > 0) return 'rgba(34, 197, 94, 1)'; // Green
+                        if (change < 0) return 'rgba(239, 68, 68, 1)'; // Red
+                        return 'rgba(156, 163, 175, 1)'; // Gray
+                      },
+                      pointBorderColor: '#ffffff',
+                      pointBorderWidth: 2,
+                      pointRadius: 4,
+                      pointHoverRadius: 6,
+                      segment: {
+                        borderColor: (ctx) => {
+                          const index = ctx.p1DataIndex;
+                          if (index === 0) return 'rgba(59, 130, 246, 1)'; // First visible segment is blue
+                          
+                          const change = rankingChanges[index + 1]; // Adjust for slice(1)
+                          if (change > 0) return 'rgba(34, 197, 94, 1)'; // Green for improvement
+                          if (change < 0) return 'rgba(239, 68, 68, 1)'; // Red for decline
+                          return 'rgba(156, 163, 175, 1)'; // Gray for no change
+                        }
+                      }
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  interaction: {
+                    intersect: false,
+                    mode: 'index',
+                  },
+                  plugins: {
+                    legend: {
+                      display: false,
+                    },
+                    tooltip: {
+                      callbacks: {
+                        title: (context: any) => {
+                          const index = context[0].dataIndex;
+                          const pokemon = sortedPokemon[index + 1]; // Adjust for slice(1)
+                          return `${pokemon.name} (#${pokemon.pokedexNumber.toString().padStart(3, '0')})`;
+                        },
+                        label: (context: any) => {
+                          const index = context.dataIndex;
+                          const pokemon = sortedPokemon[index + 1]; // Adjust for slice(1)
+                          const globalRank = context.parsed.y;
+                          const avgStars = formatAverageStars(pokemon.id);
+                          
+                          const result = [
+                            `Global Rank: #${globalRank > totalPokemon ? 'Unranked' : globalRank}`,
+                            `Artist: ${pokemon.artist}`,
+                            `Average Rating: ${avgStars}`,
+                            `Types: ${pokemon.types.join(', ')}`
+                          ];
+                          
+                          // Add ranking change info (index + 1 because we sliced)
+                          if (index >= 0) { // Now we always have a comparison since we start from second Pokemon
+                            const change = rankingChanges[index + 1];
+                            if (change > 0) {
+                              result.push(`📈 Improved by ${change} positions`);
+                            } else if (change < 0) {
+                              result.push(`📉 Declined by ${Math.abs(change)} positions`);
+                            } else {
+                              result.push(`➖ No change in ranking`);
+                            }
+                          }
+                          
+                          return result;
+                        },
+                        afterLabel: () => {
+                          return `Out of ${totalPokemon} total Pokemon`;
+                        },
+                      },
+                    },
+                  },
+                  scales: {
+                    y: {
+                      reverse: true, // Lower ranks (better) appear higher on chart
+                      beginAtZero: false,
+                      max: totalPokemon,
+                      title: {
+                        display: true,
+                        text: 'Global Rank',
+                        color: 'white',
+                        font: {
+                          size: 14,
+                          weight: 'bold',
+                        },
+                      },
+                      ticks: {
+                        color: 'white',
+                        stepSize: Math.ceil(totalPokemon / 5), // Fewer ticks = fewer grid lines
+                        callback: function(value) {
+                          return '#' + value;
+                        },
+                      },
+                      grid: {
+                        color: 'rgba(255, 255, 255, 0.1)', // More subtle grid lines
+                        lineWidth: 1,
+                      },
+                    },
+                    x: {
+                      title: {
+                        display: true,
+                        text: 'Pokemon (Pokedex Order)',
+                        color: 'white',
+                        font: {
+                          size: 14,
+                          weight: 'bold',
+                        },
+                      },
+                      ticks: {
+                        display: false, // Hide all x-axis labels
+                      },
+                      grid: {
+                        display: false, // Hide vertical grid lines completely
+                      },
+                    },
+                  },
+                }}
+              />
+            );
+          })()}
+        </div>
+        
+        {/* Legend for the color coding */}
+        <div className="mt-4 flex justify-center">
+          <div className="flex items-center space-x-6 bg-white/5 rounded-lg px-6 py-3">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-1 bg-green-500 rounded"></div>
+              <span className="text-green-400 text-sm font-medium">Ranking Improved</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-1 bg-red-500 rounded"></div>
+              <span className="text-red-400 text-sm font-medium">Ranking Declined</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-1 bg-gray-400 rounded"></div>
+              <span className="text-gray-400 text-sm font-medium">➖ No Change</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Artist Individual Stats - Tabbed Interface */}
       <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 mb-8">
         <h3 className="text-xl font-bold text-white mb-6">Individual Artist Statistics</h3>
@@ -845,6 +1045,132 @@ const Statistics = () => {
                                       ticks: {
                                         color: 'white',
                                         stepSize: 1,
+                                        callback: function(value) {
+                                          return '#' + value;
+                                        },
+                                      },
+                                      grid: {
+                                        color: 'rgba(255, 255, 255, 0.2)',
+                                      },
+                                    },
+                                    x: {
+                                      title: {
+                                        display: true,
+                                        text: 'Pokemon Names (Chronological Order)',
+                                        color: 'white',
+                                        font: {
+                                          size: 12,
+                                        },
+                                      },
+                                      ticks: {
+                                        color: 'white',
+                                        font: {
+                                          size: 9,
+                                        },
+                                        maxRotation: 45,
+                                        minRotation: 45,
+                                      },
+                                      grid: {
+                                        color: 'rgba(255, 255, 255, 0.2)',
+                                      },
+                                    },
+                                  },
+                                }}
+                              />
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Global Performance Line Chart */}
+                  {artistRankings[stat.artist] && artistRankings[stat.artist].length > 1 && (
+                    <div className="mt-6">
+                      <h5 className="text-white font-semibold mb-3 flex items-center">
+                        <Trophy className="mr-2 text-purple-400" size={16} />
+                        Global Performance Over Time ({artistRankings[stat.artist].length} Pokemon)
+                      </h5>
+                      <div className="bg-white/5 rounded-lg p-4">
+                        <div className="h-80">
+                          {(() => {
+                            // Sort Pokemon by their pokedexNumber to show chronological order
+                            const sortedByTime = [...artistRankings[stat.artist]].sort((a, b) => {
+                              return a.pokemon.pokedexNumber - b.pokemon.pokedexNumber;
+                            });
+                            
+                            return (
+                              <Line 
+                                data={{
+                                  labels: sortedByTime.map(ranking => ranking.pokemon.name),
+                                  datasets: [
+                                    {
+                                      label: 'Global Rank',
+                                      data: sortedByTime.map(ranking => getGlobalRank(ranking.pokemonId) || totalPokemon + 1),
+                                      borderColor: 'rgba(168, 85, 247, 1)', // Purple color
+                                      backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                                      borderWidth: 3,
+                                      fill: true,
+                                      tension: 0.4,
+                                      pointBackgroundColor: 'rgba(168, 85, 247, 1)',
+                                      pointBorderColor: '#ffffff',
+                                      pointBorderWidth: 2,
+                                      pointRadius: 6,
+                                      pointHoverRadius: 8,
+                                    },
+                                  ],
+                                }}
+                                options={{
+                                  responsive: true,
+                                  maintainAspectRatio: false,
+                                  plugins: {
+                                    legend: {
+                                      display: false,
+                                    },
+                                    tooltip: {
+                                      callbacks: {
+                                        title: (context: any) => {
+                                          const index = context[0].dataIndex;
+                                          const pokemon = sortedByTime[index].pokemon;
+                                          return `${pokemon.name} (#${pokemon.pokedexNumber.toString().padStart(3, '0')})`;
+                                        },
+                                        label: (context: any) => {
+                                          const globalRank = context.parsed.y;
+                                          const pokemonData = sortedByTime[context.dataIndex];
+                                          const avgStars = formatAverageStars(pokemonData.pokemonId);
+                                          const artistRanksMap = new Map();
+                                          artistRankings[stat.artist].forEach((ranking, index) => {
+                                            artistRanksMap.set(ranking.pokemonId, index + 1);
+                                          });
+                                          const artistRank = artistRanksMap.get(pokemonData.pokemonId);
+                                          return [
+                                            `Global Rank: #${globalRank > totalPokemon ? 'Unranked' : globalRank}`,
+                                            `Artist Rank: #${artistRank}`,
+                                            `Average Rating: ${avgStars}`
+                                          ];
+                                        },
+                                        afterLabel: () => {
+                                          return `Out of ${totalPokemon} total Pokemon`;
+                                        },
+                                      },
+                                    },
+                                  },
+                                  scales: {
+                                    y: {
+                                      reverse: true, // Lower ranks (better) appear higher on chart
+                                      beginAtZero: false,
+                                      max: totalPokemon,
+                                      title: {
+                                        display: true,
+                                        text: 'Global Rank (out of all Pokemon)',
+                                        color: 'white',
+                                        font: {
+                                          size: 12,
+                                        },
+                                      },
+                                      ticks: {
+                                        color: 'white',
+                                        stepSize: Math.ceil(totalPokemon / 10), // Divide into ~10 steps
                                         callback: function(value) {
                                           return '#' + value;
                                         },
