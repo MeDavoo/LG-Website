@@ -1103,9 +1103,9 @@ const Home = () => {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') {
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
         navigatePrevious();
-      } else if (e.key === 'ArrowRight') {
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
         navigateNext();
       }
     };
