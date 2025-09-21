@@ -46,6 +46,7 @@ const Statistics = () => {
   const [activePerformanceTab, setActivePerformanceTab] = useState<'artist' | 'global'>('artist'); // State for performance chart tabs
   const [globalRankingsFilter, setGlobalRankingsFilter] = useState<'all' | 'half' | 'quarter' | 'eighth'>('all'); // State for global rankings filter
   const [globalRankingsView, setGlobalRankingsView] = useState<'single' | 'evolution'>('single'); // State for single vs evolution line view
+  const [sortByRank, setSortByRank] = useState<boolean>(false); // State for sorting by rank instead of chronological order
 
   useEffect(() => {
     loadPokemonData();
@@ -705,6 +706,21 @@ const Statistics = () => {
           </button>
         </div>
 
+        {/* Sort Toggle Button */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => setSortByRank(!sortByRank)}
+            className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium flex items-center gap-2 ${
+              sortByRank
+                ? 'bg-green-500 text-white'
+                : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            <TrendingUp size={16} />
+            {sortByRank ? 'Sorted by Rank' : 'Sort by Rank'}
+          </button>
+        </div>
+
         <div className="h-96">
           {(() => {
             // Get all Pokemon sorted by Pokedex number, excluding legendaries (evolutionStage: 4)
@@ -714,8 +730,10 @@ const Statistics = () => {
               // Evolution Lines View
               const evolutionLines = groupPokemonByEvolutionLines(nonLegendaryPokemon);
               
-              // Filter out evolution lines that have no rankings at all
-              const rankedLines = evolutionLines.filter(line => line.averageRank !== null);
+              // Filter out evolution lines that have no rankings at all OR are single Pokemon (no actual evolution)
+              const rankedLines = evolutionLines.filter(line => 
+                line.averageRank !== null && line.pokemon.length > 1
+              );
               
               // Apply filtering based on selected filter
               let filteredLines = rankedLines;
@@ -734,6 +752,11 @@ const Statistics = () => {
                 default: // 'all'
                   filteredLines = rankedLines;
                   break;
+              }
+              
+              // Sort by rank if toggle is enabled
+              if (sortByRank) {
+                filteredLines.sort((a, b) => a.averageRank! - b.averageRank!); // Sort from best (1) to worst rank
               }
               
               // Calculate ranking changes for evolution lines
@@ -914,7 +937,7 @@ const Statistics = () => {
                       x: {
                         title: {
                           display: true,
-                          text: `Evolution Lines (${globalRankingsFilter === 'all' ? 'All' : 'Recent'} - Pokedex Order)`,
+                          text: `Evolution Lines (${globalRankingsFilter === 'all' ? 'All' : 'Recent'} - ${sortByRank ? 'Rank Order' : 'Pokedex Order'})`,
                           color: 'white',
                           font: {
                             size: 14,
@@ -934,7 +957,7 @@ const Statistics = () => {
               );
             } else {
               // Individual Pokemon View (existing logic)
-              const sortedPokemon = [...nonLegendaryPokemon].sort((a, b) => a.pokedexNumber - b.pokedexNumber);
+              let sortedPokemon = [...nonLegendaryPokemon].sort((a, b) => a.pokedexNumber - b.pokedexNumber);
               
               // Filter out Pokemon that don't have global rankings
               const rankedPokemon = sortedPokemon.filter(pokemon => getGlobalRank(pokemon.id) !== null);
@@ -956,6 +979,15 @@ const Statistics = () => {
                 default: // 'all'
                   filteredPokemon = rankedPokemon;
                   break;
+              }
+              
+              // Sort by rank if toggle is enabled
+              if (sortByRank) {
+                filteredPokemon.sort((a, b) => {
+                  const rankA = getGlobalRank(a.id)!;
+                  const rankB = getGlobalRank(b.id)!;
+                  return rankA - rankB; // Sort from best (1) to worst rank
+                });
               }
               
               // Calculate ranking changes for color coding (for the filtered set)
@@ -1149,7 +1181,7 @@ const Statistics = () => {
                       x: {
                         title: {
                           display: true,
-                          text: `Pokemon (${globalRankingsFilter === 'all' ? 'All' : 'Recent'} - Pokedex Order)`,
+                          text: `Pokemon (${globalRankingsFilter === 'all' ? 'All' : 'Recent'} - ${sortByRank ? 'Rank Order' : 'Pokedex Order'})`,
                           color: 'white',
                           font: {
                             size: 14,

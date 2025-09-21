@@ -22,6 +22,7 @@ export interface Pokemon {
   types: string[];
   unique?: string; // U0, U1, U2 for unique Pokemon
   evolutionStage?: number; // 0=base, 1=first evo, 2=second evo, 3=GMAX, 4=Legendary, 5=MEGA
+  info?: string; // Optional info text for tooltip display
   createdAt: Date;
   updatedAt: Date;
 }

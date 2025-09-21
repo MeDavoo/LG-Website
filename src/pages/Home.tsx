@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber, saveRating, getAllRatings, getGlobalRankings, reorganizePokedex } from '../services/pokemonService';
+import { deleteField } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 
@@ -15,6 +16,7 @@ interface PokemonSlot {
   unique?: string; // U0, U1, U2 for unique Pokemon (0=no evolve, 1=evolves once, 2=evolves twice)
   evolutionStage?: number; // 0=base, 1=first evo, 2=second evo, 3=GMAX, 4=Legendary, 5=MEGA
   firebaseId?: string; // Firebase document ID for updates
+  info?: string; // Optional info text that appears in tooltip
 }
 
 const Home = () => {
@@ -82,7 +84,8 @@ const Home = () => {
             unique: pokemonFromFirebase.unique,
             evolutionStage: pokemonFromFirebase.evolutionStage,
             hasArt: true,
-            firebaseId: pokemonFromFirebase.id
+            firebaseId: pokemonFromFirebase.id,
+            info: pokemonFromFirebase.info
           });
         } else {
           slots.push({
@@ -188,6 +191,7 @@ const Home = () => {
       evolutionStage: selectedPokemon.evolutionStage || 0,
       image: null, // Reset image field
       additionalImages: [], // Reset additional images field
+      info: selectedPokemon.info || ''
     });
     setShowEditForm(true);
   };
@@ -240,7 +244,7 @@ const Home = () => {
         finalAdditionalImages = [...finalAdditionalImages, ...additionalImages];
       }
 
-      const updates = {
+      const updates: any = {
         name: editFormData.name,
         artist: editFormData.artist,
         types: editFormData.types,
@@ -250,6 +254,14 @@ const Home = () => {
         additionalImages: finalAdditionalImages, // Always update to reflect any additions or deletions
         updatedAt: new Date()
       };
+
+      // Handle info field - add it if there's content, remove it if empty
+      if (editFormData.info && editFormData.info.trim()) {
+        updates.info = editFormData.info.trim();
+      } else {
+        // Use deleteField to remove the info field from Firestore if it exists
+        updates.info = deleteField();
+      }
 
       const success = await updatePokemon(selectedPokemon.firebaseId, updates);
       if (success) {
@@ -265,7 +277,8 @@ const Home = () => {
           evolutionStage: editFormData.evolutionStage,
           unique: editFormData.unique,
           imageUrl: imageUrl,
-          additionalImages: finalAdditionalImages
+          additionalImages: finalAdditionalImages,
+          info: editFormData.info && editFormData.info.trim() ? editFormData.info.trim() : undefined
         } : null);
         
         await loadPokemonData(); // Refresh the data
@@ -312,7 +325,8 @@ const Home = () => {
         types: addFormData.types,
         imageUrl,
         evolutionStage: addFormData.evolutionStage,
-        ...(addFormData.unique && { unique: addFormData.unique })
+        ...(addFormData.unique && { unique: addFormData.unique }),
+        ...(addFormData.info && addFormData.info.trim() && { info: addFormData.info.trim() })
       };
 
       await addPokemon(pokemonData);
@@ -327,7 +341,8 @@ const Home = () => {
         types: [],
         unique: '',
         evolutionStage: 0,
-        image: null
+        image: null,
+        info: ''
       });
       
       // Reorganize Pokedex to ensure proper ordering (legendaries at bottom)
@@ -597,6 +612,7 @@ const Home = () => {
     evolutionStage: 0,
     image: null as File | null,
     additionalImages: [] as File[], // Up to 3 additional images
+    info: ''
   });
   const [addFormData, setAddFormData] = useState({
     name: '',
@@ -604,7 +620,8 @@ const Home = () => {
     types: [] as string[],
     unique: '',
     evolutionStage: 0,
-    image: null as File | null
+    image: null as File | null,
+    info: ''
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -1958,9 +1975,27 @@ const Home = () => {
                     
                     {/* Name and Types */}
                     <div className="text-center">
-                      <h2 className="text-xl font-bold text-white mb-2">
-                        {selectedPokemon.name}
-                      </h2>
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <h2 className="text-xl font-bold text-white">
+                          {selectedPokemon.name}
+                        </h2>
+                        {/* Info Button - Only show if info text exists */}
+                        {selectedPokemon.info && selectedPokemon.info.trim() && (
+                          <div className="relative group">
+                            <button className="text-white/60 hover:text-white transition-colors duration-200">
+                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                            {/* Tooltip */}
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black/90 text-white text-sm rounded-lg border border-white/20 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 max-w-xs whitespace-normal">
+                              {selectedPokemon.info}
+                              {/* Arrow */}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-black/90"></div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       {/* Types next to name */}
                       {selectedPokemon.types && (
                         <div className="flex flex-wrap gap-1 justify-center">
@@ -2598,6 +2633,20 @@ const Home = () => {
                 </div>
               </div>
 
+              {/* Info Text */}
+              <div>
+                <label className="block text-white font-semibold mb-2">
+                  Info Text <span className="text-xs text-white/60">(Optional)</span>
+                </label>
+                <textarea
+                  value={editFormData.info}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, info: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                  placeholder="Enter optional info text..."
+                  rows={3}
+                />
+              </div>
+
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
                 <button
@@ -2767,6 +2816,20 @@ const Home = () => {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Info Text */}
+              <div>
+                <label className="block text-white font-semibold mb-2">
+                  Info Text <span className="text-xs text-white/60">(Optional)</span>
+                </label>
+                <textarea
+                  value={addFormData.info}
+                  onChange={(e) => setAddFormData(prev => ({ ...prev, info: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                  placeholder="Enter optional info text..."
+                  rows={3}
+                />
               </div>
 
               {/* Action Buttons */}
