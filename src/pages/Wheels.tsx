@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getAllPokemon, Pokemon } from '../services/pokemonService';
 import SpinningWheel, { WheelSegment } from '../components/SpinningWheel';
 import { getAllPokemonFromGenerations, pokemonGenerations, getPokemonArtworkUrl } from '../data/pokemonData';
+import Footer from '../components/Footer';
 
 interface WheelTab {
   id: string;
@@ -229,6 +230,7 @@ const Wheels = () => {
   };
 
   return (
+    <>
     <div className="max-w-full mx-auto relative min-h-screen transform scale-90 origin-top mt-4">
       {/* Loading State */}
       {loading && (
@@ -686,6 +688,10 @@ const Wheels = () => {
         </div>
       )}
     </div>
+    
+    {/* Footer */}
+    <Footer />
+    </>
   );
 };
 

@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { Heart, User, Calendar, MessageCircle } from 'lucide-react';
 import { Pokemon } from '../types/pokemon';
+import Footer from '../components/Footer';
 
 const PokemonDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -87,6 +88,7 @@ const PokemonDetail = () => {
   }
 
   return (
+    <>
     <div className="max-w-6xl mx-auto">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Image */}
@@ -187,6 +189,10 @@ const PokemonDetail = () => {
         )}
       </div>
     </div>
+    
+    {/* Footer */}
+    <Footer />
+    </>
   );
 };
 

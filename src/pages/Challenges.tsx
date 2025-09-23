@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAllChallengeArt, addChallengeArt, uploadChallengeImage, uploadPokemonImage, uploadAdditionalChallengeImages, updateChallengeArt, deleteChallengeArtWithImage, ChallengeArt } from '../services/challengeService';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
+import Footer from '../components/Footer';
 
 interface ChallengeTab {
   id: string;
@@ -1226,6 +1227,9 @@ const Challenges = () => {
         </div>
       )}
       </div>
+      
+      {/* Footer */}
+      <Footer />
 
       {/* Add Challenge Art Modal */}
       {showAddForm && (

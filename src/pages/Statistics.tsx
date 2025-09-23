@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Users, Image, Palette, TrendingUp, TrendingDown, Trophy } from 'lucide-react';
 import { getAllPokemon, Pokemon, getArtistRankings, getAllRatings, PokemonRating, getGlobalRankings } from '../services/pokemonService';
+import Footer from '../components/Footer';
 
 ChartJS.register(
   CategoryScale,
@@ -529,6 +530,7 @@ const Statistics = () => {
   }
 
   return (
+    <>
     <div className="max-w-7xl mx-auto">
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-white mb-4">Statistics</h1>
@@ -1792,8 +1794,9 @@ const Statistics = () => {
           </div>
         )}
       </div>
-
     </div>
+    <Footer />
+    </>
   );
 };
 

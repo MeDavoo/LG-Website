@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber, saveRating, getAllRatings, getGlobalRankings, reorganizePokedex, saveFavorite, getAllFavorites, getUserFavorites, cleanupFavoriteDocuments, forceDeleteFavorite, resetAllFavorites } from '../services/pokemonService';
 import { deleteField } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 
 interface PokemonSlot {
@@ -2587,6 +2588,9 @@ const Home = () => {
         </>
       )}
       </div>
+      
+      {/* Footer */}
+      <Footer />
       
       {/* Edit Pokemon Modal */}
       {showEditForm && selectedPokemon && (
