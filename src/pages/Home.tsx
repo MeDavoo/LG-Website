@@ -1018,17 +1018,29 @@ const Home = () => {
   const [ratingSortOrder, setRatingSortOrder] = useState<'none' | 'ascending' | 'descending'>('none'); // Sort by global ranking
   const [showTiers, setShowTiers] = useState(true); // Toggle tier letters display
 
-  // Collapsible filter sections state
+  // Collapsible filter sections state (with localStorage persistence)
   const [collapsedSections, setCollapsedSections] = useState<{
     types: boolean;
     artists: boolean;
     evolution: boolean;
     rating: boolean;
-  }>({
-    types: true,
-    artists: true,
-    evolution: true,
-    rating: true
+  }>(() => {
+    // Load saved state from localStorage, default to closed for new users
+    const saved = localStorage.getItem('pokemon_filter_collapsed_sections');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (error) {
+        console.error('Error parsing saved filter states:', error);
+      }
+    }
+    // Default state for new users (all collapsed)
+    return {
+      types: true,
+      artists: true,
+      evolution: true,
+      rating: true
+    };
   });
 
   // Rating distribution dropdown state (closed by default)
@@ -1036,10 +1048,15 @@ const Home = () => {
 
   // Toggle collapse state for a section
   const toggleSection = (section: keyof typeof collapsedSections) => {
-    setCollapsedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+    setCollapsedSections(prev => {
+      const newState = {
+        ...prev,
+        [section]: !prev[section]
+      };
+      // Save to localStorage
+      localStorage.setItem('pokemon_filter_collapsed_sections', JSON.stringify(newState));
+      return newState;
+    });
   };
 
   // User rating statistics
