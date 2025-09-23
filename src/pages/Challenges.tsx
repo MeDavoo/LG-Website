@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllChallengeArt, addChallengeArt, uploadChallengeImage, uploadPokemonImage, updateChallengeArt, deleteChallengeArtWithImage, ChallengeArt } from '../services/challengeService';
+import { getAllChallengeArt, addChallengeArt, uploadChallengeImage, uploadPokemonImage, uploadAdditionalChallengeImages, updateChallengeArt, deleteChallengeArtWithImage, ChallengeArt } from '../services/challengeService';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 
 interface ChallengeTab {
@@ -33,6 +33,7 @@ const Challenges = () => {
     challenge: 'alt-evo',
     types: [] as string[],
     image: null as File | null,
+    additionalImages: [] as File[], // Up to 3 additional images
     // Fusion specific fields
     pokemon1Name: '',
     pokemon1ImageUrl: '',
@@ -58,6 +59,7 @@ const Challenges = () => {
     challenge: 'alt-evo',
     types: [] as string[],
     image: null as File | null,
+    additionalImages: [] as File[], // Up to 3 additional images
     // Fusion specific fields
     pokemon1Name: '',
     pokemon1ImageUrl: '',
@@ -70,6 +72,9 @@ const Challenges = () => {
     // Theme specific fields
     themeName: ''
   });
+
+  // Image switching state for additional images
+  const [currentDisplayImage, setCurrentDisplayImage] = useState<string | null>(null);
 
   // Notification system
   const [notification, setNotification] = useState<{
@@ -89,8 +94,14 @@ const Challenges = () => {
       const data = await getAllChallengeArt();
       setChallengeArt(data);
       
-      // Auto-select first art with artwork when data loads
-      if (data.length > 0 && !selectedArt) {
+      // If we have a selected art, find and update it with fresh data
+      if (selectedArt) {
+        const updatedSelectedArt = data.find(art => art.id === selectedArt.id);
+        if (updatedSelectedArt) {
+          setSelectedArt(updatedSelectedArt);
+        }
+      } else if (data.length > 0) {
+        // Auto-select first art if none selected
         setSelectedArt(data[0]);
       }
     } catch (error) {
@@ -108,12 +119,66 @@ const Challenges = () => {
     }, 5000);
   };
 
+  // Image switching functions for additional images
+  const handleImageSwitch = (clickedImageUrl: string) => {
+    if (!selectedArt) return;
+    
+    // Simple toggle logic: whatever is clicked becomes the main display
+    if (clickedImageUrl === selectedArt.imageUrl) {
+      // Clicking main image button - switch back to main
+      setCurrentDisplayImage(null);
+    } else {
+      // Clicking additional image button - switch to that image
+      setCurrentDisplayImage(clickedImageUrl);
+    }
+  };
+
+  // Get the currently displayed image URL
+  const getDisplayedImageUrl = (): string => {
+    if (currentDisplayImage && selectedArt) {
+      return currentDisplayImage;
+    }
+    return selectedArt?.imageUrl || '';
+  };
+
+  // Reset displayed image when challenge art changes
+  useEffect(() => {
+    setCurrentDisplayImage(null);
+  }, [selectedArt?.id]);
+
+  // Handle deleting additional images
+  const handleDeleteAdditionalImage = (imageUrl: string) => {
+    if (!selectedArt) return;
+    
+    console.log('Deleting additional image:', imageUrl);
+    console.log('Current additional images:', selectedArt.additionalImages);
+    
+    const updatedImages = selectedArt.additionalImages?.filter(url => url !== imageUrl) || [];
+    
+    console.log('Updated additional images after delete:', updatedImages);
+    
+    // Update selected art state immediately for UI
+    setSelectedArt(prev => prev ? {
+      ...prev,
+      additionalImages: updatedImages
+    } : null);
+    
+    // If the deleted image was currently displayed, reset to main image
+    if (currentDisplayImage === imageUrl) {
+      setCurrentDisplayImage(null);
+    }
+    
+    // Show notification that image will be removed when user saves
+    showNotification('✅ Additional image will be removed when you save changes', 'info');
+  };
+
   // Handle challenge type change
   const handleChallengeTypeChange = (challengeType: string) => {
     setAddFormData(prev => ({
       ...prev,
       challenge: challengeType,
       // Reset challenge-specific fields
+      additionalImages: [],
       pokemon1Name: '',
       pokemon1ImageUrl: '',
       pokemon1Image: null,
@@ -184,6 +249,16 @@ const Challenges = () => {
         return;
       }
 
+      // Upload additional images if any
+      let additionalImages: string[] = [];
+      if (addFormData.additionalImages.length > 0) {
+        additionalImages = await uploadAdditionalChallengeImages(addFormData.additionalImages, addFormData.name);
+        if (additionalImages.length !== addFormData.additionalImages.length) {
+          showNotification('❌ Some additional images failed to upload. Please try again.', 'error');
+          return;
+        }
+      }
+
       // Add challenge art to database
       const challengeArtData: any = {
         name: addFormData.name,
@@ -191,6 +266,11 @@ const Challenges = () => {
         types: addFormData.types,
         imageUrl
       };
+
+      // Only add additionalImages if there are any, otherwise omit the field entirely  
+      if (additionalImages.length > 0) {
+        challengeArtData.additionalImages = additionalImages;
+      }
 
       // Add creator if not body-completion
       if (addFormData.challenge !== 'body-completion') {
@@ -243,6 +323,7 @@ const Challenges = () => {
           challenge: 'alt-evo',
           types: [],
           image: null,
+          additionalImages: [],
           pokemon1Name: '',
           pokemon1ImageUrl: '',
           pokemon1Image: null,
@@ -254,6 +335,15 @@ const Challenges = () => {
         });
         
         await loadChallengeData(); // Refresh the data
+        
+        // Select the newly added art (it will be first in the list since we order by createdAt desc)
+        const refreshedData = await getAllChallengeArt();
+        if (refreshedData.length > 0) {
+          const newlyAddedArt = refreshedData.find(art => art.name === challengeArtData.name);
+          if (newlyAddedArt) {
+            setSelectedArt(newlyAddedArt);
+          }
+        }
       } else {
         showNotification('❌ Error adding challenge art. Please try again.', 'error');
       }
@@ -325,6 +415,29 @@ const Challenges = () => {
     }
   };
 
+  // Handle additional images change for Add form
+  const handleAdditionalImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 3) {
+      showNotification('You can only upload up to 3 additional images', 'error');
+      return;
+    }
+    
+    // Validate each file
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
+        showNotification('Each image should be less than 5MB', 'error');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        showNotification('Please select valid image files only', 'error');
+        return;
+      }
+    }
+    
+    setAddFormData(prev => ({ ...prev, additionalImages: files }));
+  };
+
   // Handle editing challenge art
   const handleEditChallengeArt = () => {
     if (!selectedArt) return;
@@ -335,6 +448,7 @@ const Challenges = () => {
       challenge: selectedArt.challenge,
       types: [...selectedArt.types],
       image: null,
+      additionalImages: [],
       pokemon1Name: selectedArt.pokemon1Name || '',
       pokemon1ImageUrl: selectedArt.pokemon1ImageUrl || '',
       pokemon1Image: null,
@@ -408,6 +522,21 @@ const Challenges = () => {
         imageUrl = newImageUrl;
       }
 
+      // Handle additional images - use the current state which includes deletions
+      let finalAdditionalImages = selectedArt.additionalImages || [];
+      console.log('Before update - selectedArt.additionalImages:', finalAdditionalImages);
+      
+      if (editFormData.additionalImages.length > 0) {
+        const uploadedAdditionalImages = await uploadAdditionalChallengeImages(editFormData.additionalImages, editFormData.name);
+        if (uploadedAdditionalImages.length !== editFormData.additionalImages.length) {
+          showNotification('❌ Some additional images failed to upload. Please try again.', 'error');
+          return;
+        }
+        finalAdditionalImages = [...finalAdditionalImages, ...uploadedAdditionalImages];
+      }
+      
+      console.log('Final additional images to save:', finalAdditionalImages);
+
       // Update challenge art in database
       const challengeArtData: any = {
         name: editFormData.name,
@@ -415,6 +544,14 @@ const Challenges = () => {
         types: editFormData.types,
         imageUrl
       };
+
+      // Always set additionalImages field to handle both additions and deletions
+      if (finalAdditionalImages.length > 0) {
+        challengeArtData.additionalImages = finalAdditionalImages;
+      } else {
+        // Explicitly set to empty array to remove all additional images
+        challengeArtData.additionalImages = [];
+      }
 
       // Add creator if not body-completion
       if (editFormData.challenge !== 'body-completion') {
@@ -464,7 +601,19 @@ const Challenges = () => {
       if (success) {
         showNotification(`✅ ${editFormData.name} has been updated successfully!`, 'success');
         setShowEditForm(false);
-        await loadChallengeData(); // Refresh the data
+        
+        // Store the updated art ID to re-select it after refresh
+        const updatedArtId = selectedArt.id;
+        
+        // Refresh the data which will automatically update selectedArt
+        await loadChallengeData();
+        
+        // Re-select the updated art to show the new additional images
+        const refreshedData = await getAllChallengeArt();
+        const updatedArt = refreshedData.find(art => art.id === updatedArtId);
+        if (updatedArt) {
+          setSelectedArt(updatedArt);
+        }
       } else {
         showNotification('❌ Error updating challenge art. Please try again.', 'error');
       }
@@ -558,6 +707,29 @@ const Challenges = () => {
         break;
       }
     }
+  };
+
+  // Handle additional images change for Edit form
+  const handleEditAdditionalImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 3) {
+      showNotification('You can only upload up to 3 additional images', 'error');
+      return;
+    }
+    
+    // Validate each file
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
+        showNotification('Each image should be less than 5MB', 'error');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        showNotification('Please select valid image files only', 'error');
+        return;
+      }
+    }
+    
+    setEditFormData(prev => ({ ...prev, additionalImages: files }));
   };
 
   // Filter art by active challenge
@@ -667,7 +839,10 @@ const Challenges = () => {
                     {filteredArt.map((art) => (
                       <div
                         key={art.id}
-                        onClick={() => setSelectedArt(art)}
+                        onClick={() => {
+                          setSelectedArt(art);
+                          setCurrentDisplayImage(null); // Reset image display when selecting new art
+                        }}
                         className={`group cursor-pointer bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-3 hover:bg-white/20 transition-all duration-300 ${
                           selectedArt?.id === art.id ? 'ring-2 ring-yellow-400 bg-white/20' : ''
                         }`}
@@ -773,12 +948,55 @@ const Challenges = () => {
                 {selectedArt ? (
                   <div className="space-y-4">
                     {/* Art Image */}
-                    <div className="w-full rounded-lg overflow-hidden bg-white/5" style={{aspectRatio: '1/1', maxHeight: '500px'}}>
+                    <div className="relative w-full rounded-lg overflow-hidden bg-white/5" style={{aspectRatio: '1/1', maxHeight: '500px'}}>
                       <img
-                        src={selectedArt.imageUrl}
+                        src={getDisplayedImageUrl()}
                         alt={selectedArt.name}
                         className="w-full h-full object-contain"
                       />
+                      
+                      {/* Additional Image Buttons - Vertical layout, positioned inside bottom-right */}
+                      {selectedArt.additionalImages && selectedArt.additionalImages.length > 0 && (
+                        <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-10">
+                          {/* Show main image button only if we're NOT currently viewing the main image */}
+                          {currentDisplayImage && (
+                            <button
+                              onClick={() => handleImageSwitch(selectedArt.imageUrl)}
+                              className="w-12 h-12 rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-110 border-yellow-400/70 hover:border-yellow-300 shadow-md shadow-yellow-400/25"
+                              title="Main image"
+                            >
+                              <img
+                                src={selectedArt.imageUrl}
+                                alt="Main"
+                                className="w-full h-full object-cover"
+                              />
+                            </button>
+                          )}
+                          
+                          {/* Show additional image buttons only if they're NOT currently displayed */}
+                          {selectedArt.additionalImages.map((imageUrl, index) => {
+                            // Only show this button if this image is NOT currently displayed
+                            if (currentDisplayImage === imageUrl) {
+                              return null;
+                            }
+
+                            return (
+                              <button
+                                key={index}
+                                onClick={() => handleImageSwitch(imageUrl)}
+                                className="w-12 h-12 rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-110 border-white/40 hover:border-white/60"
+                                title={`Additional image ${index + 1}`}
+                              >
+                                <img
+                                  src={imageUrl}
+                                  alt={`Additional ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                     
                     {/* Art Information */}
@@ -1236,6 +1454,37 @@ const Challenges = () => {
                 </p>
               </div>
 
+              {/* Additional Images Upload */}
+              <div>
+                <label className="block text-white font-semibold mb-2">
+                  Additional Images <span className="text-xs text-white/60">(Up to 3 images)</span>
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleAdditionalImagesChange}
+                  className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-500 file:text-white hover:file:bg-purple-600"
+                />
+                {addFormData.additionalImages.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-green-400 text-sm mb-2">
+                      ✅ {addFormData.additionalImages.length} additional image{addFormData.additionalImages.length > 1 ? 's' : ''} selected
+                    </p>
+                    <div className="flex gap-2 flex-wrap">
+                      {addFormData.additionalImages.map((file, index) => (
+                        <div key={index} className="text-xs text-white/60 bg-white/10 px-2 py-1 rounded">
+                          {file.name}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="text-white/40 text-xs mt-1">
+                  Select up to 3 additional images. These will appear as clickable buttons in the detail view. Max size: 5MB each.
+                </p>
+              </div>
+
               {/* Types Selection - Show for most challenges except trainers and fusions (unless gym leader) */}
               {((addFormData.challenge !== 'trainers' && addFormData.challenge !== 'fusions') || (addFormData.challenge === 'trainers' && addFormData.trainerType === 'gym-leader')) && (
                 <div>
@@ -1560,6 +1809,69 @@ const Challenges = () => {
                     Leave empty to keep current image, or select a new image to replace it
                   </p>
                 )}
+              </div>
+
+              {/* Additional Images Upload (Edit Only) */}
+              <div>
+                <label className="block text-white font-semibold mb-2">
+                  Additional Images <span className="text-xs text-white/60">(Up to 3 images)</span>
+                </label>
+                
+                {/* Existing Additional Images */}
+                {selectedArt.additionalImages && selectedArt.additionalImages.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-white/60 text-sm mb-2">Current Additional Images:</p>
+                    <div className="flex gap-3 flex-wrap">
+                      {selectedArt.additionalImages.map((imageUrl, index) => (
+                        <div key={index} className="relative group">
+                          <div className="w-20 h-20 rounded-lg overflow-hidden border border-white/20">
+                            <img
+                              src={imageUrl}
+                              alt={`Additional ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <button
+                            onClick={() => handleDeleteAdditionalImage(imageUrl)}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs flex items-center justify-center transition-all duration-200 opacity-0 group-hover:opacity-100"
+                            title="Delete this image"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Upload New Additional Images */}
+                <div>
+                  <p className="text-white/60 text-sm mb-2">Add New Additional Images:</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleEditAdditionalImagesChange}
+                    className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-500 file:text-white hover:file:bg-purple-600"
+                  />
+                  {editFormData.additionalImages.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-green-400 text-sm mb-2">
+                        ✅ {editFormData.additionalImages.length} new image{editFormData.additionalImages.length > 1 ? 's' : ''} selected
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {editFormData.additionalImages.map((file, index) => (
+                          <div key={index} className="text-xs text-white/60 bg-white/10 px-2 py-1 rounded">
+                            {file.name}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-white/40 text-xs mt-1">
+                    Select up to 3 additional images. These will appear as clickable buttons in the detail view. Max size: 5MB each.
+                  </p>
+                </div>
               </div>
 
               {/* Types Selection - Show for most challenges except trainers and fusions (unless gym leader) */}

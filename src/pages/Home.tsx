@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber, saveRating, getAllRatings, getGlobalRankings, reorganizePokedex } from '../services/pokemonService';
+import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber, saveRating, getAllRatings, getGlobalRankings, reorganizePokedex, saveFavorite, getAllFavorites, getUserFavorites, cleanupFavoriteDocuments, forceDeleteFavorite, resetAllFavorites } from '../services/pokemonService';
 import { deleteField } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
@@ -17,11 +17,12 @@ interface PokemonSlot {
   evolutionStage?: number; // 0=base, 1=first evo, 2=second evo, 3=GMAX, 4=Legendary, 5=MEGA
   firebaseId?: string; // Firebase document ID for updates
   info?: string; // Optional info text that appears in tooltip
+  favoriteCount?: number; // Total number of favorites for this Pokemon
 }
 
 const Home = () => {
   // Admin authentication
-  const { requireAdmin } = useAdminAuth();
+  const { requireAdmin, isAdmin } = useAdminAuth();
   
   // Pokemon data from Firebase
   const [_pokemonData, setPokemonData] = useState<Pokemon[]>([]);
@@ -73,6 +74,7 @@ const Home = () => {
         const pokemonFromFirebase = firebasePokemon.find(p => p.pokedexNumber === i);
         
         if (pokemonFromFirebase) {
+          const favoriteCount = pokemonFavorites[pokemonFromFirebase.id] || 0;
           slots.push({
             id: i,
             name: pokemonFromFirebase.name,
@@ -85,7 +87,8 @@ const Home = () => {
             evolutionStage: pokemonFromFirebase.evolutionStage,
             hasArt: true,
             firebaseId: pokemonFromFirebase.id,
-            info: pokemonFromFirebase.info
+            info: pokemonFromFirebase.info,
+            favoriteCount: favoriteCount
           });
         } else {
           slots.push({
@@ -922,7 +925,79 @@ const Home = () => {
   // Load ratings when component mounts
   useEffect(() => {
     loadRatings();
+    loadFavorites();
+    
+    // Make debug functions available globally for debugging
+    if (typeof window !== 'undefined') {
+      (window as any).cleanupFavorites = cleanupFavoriteDocuments;
+      (window as any).forceDeleteFavorite = forceDeleteFavorite;
+      (window as any).resetAllFavorites = resetAllFavorites;
+      console.log('🔧 Debug functions available:');
+      console.log('  - window.cleanupFavorites()');
+      console.log('  - window.forceDeleteFavorite(pokemonId, deviceId)');
+      console.log('  - window.resetAllFavorites()');
+    }
   }, []);
+
+  // Favorites System Functions
+  const loadFavorites = async () => {
+    try {
+      const deviceId = getDeviceId();
+      
+      // Load user's favorites from Firebase
+      const userFavs = await getUserFavorites(deviceId);
+      setUserFavorites(userFavs);
+      console.log(`📱 Loaded ${userFavs.length} user favorites:`, userFavs);
+
+      // Load all Pokemon favorite counts from Firebase
+      const allFavorites = await getAllFavorites();
+      setPokemonFavorites(allFavorites);
+      console.log(`🌐 Loaded favorite counts for ${Object.keys(allFavorites).length} Pokemon:`, allFavorites);
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  };
+
+  const handleFavoriteToggle = async (pokemonId: string) => {
+    if (!pokemonId) return;
+
+    const deviceId = getDeviceId();
+    const isCurrentlyFavorited = userFavorites.includes(pokemonId);
+
+    console.log(`🔄 ${isCurrentlyFavorited ? 'Removing' : 'Adding'} favorite: ${pokemonId}`);
+
+    if (isCurrentlyFavorited) {
+      // Remove from favorites
+      const success = await saveFavorite(pokemonId, deviceId, false);
+      if (success) {
+        showNotification('❤️ Removed from favorites', 'info');
+        // Reload favorites to get fresh data
+        loadFavorites();
+      }
+    } else {
+      // Add to favorites
+      if (userFavorites.length >= 3) {
+        setShowFavoritePopup(true);
+        setTimeout(() => setShowFavoritePopup(false), 3000);
+        return;
+      }
+
+      const success = await saveFavorite(pokemonId, deviceId, true);
+      if (success) {
+        showNotification('❤️ Added to favorites!', 'success');
+        // Reload favorites to get fresh data
+        loadFavorites();
+      }
+    }
+  };
+
+  const isPokemonFavorited = (pokemonId: string): boolean => {
+    return userFavorites.includes(pokemonId);
+  };
+
+  const getPokemonFavoriteCount = (pokemonId: string): number => {
+    return pokemonFavorites[pokemonId] || 0;
+  };
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -931,6 +1006,12 @@ const Home = () => {
   const [uniqueOnly, setUniqueOnly] = useState(false);
   const [evolutionFilter, setEvolutionFilter] = useState<'all' | 'stage0' | 'stage1' | 'stage2' | 'gmax' | 'legendary' | 'mega' | 'evolved'>('all'); // Evolution filtering including new types
   const [userRatingFilter, setUserRatingFilter] = useState<number | null>(null); // Filter by user's own ratings
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false); // Filter to show only favorites
+  
+  // Favorites System state
+  const [userFavorites, setUserFavorites] = useState<string[]>([]);
+  const [pokemonFavorites, setPokemonFavorites] = useState<{[pokemonId: string]: number}>({});
+  const [showFavoritePopup, setShowFavoritePopup] = useState(false);
   
   // Rating sorting and tier display states
   const [ratingSortOrder, setRatingSortOrder] = useState<'none' | 'ascending' | 'descending'>('none'); // Sort by global ranking
@@ -943,10 +1024,10 @@ const Home = () => {
     evolution: boolean;
     rating: boolean;
   }>({
-    types: false,
-    artists: false,
-    evolution: false,
-    rating: false
+    types: true,
+    artists: true,
+    evolution: true,
+    rating: true
   });
 
   // Rating distribution dropdown state (closed by default)
@@ -978,7 +1059,7 @@ const Home = () => {
   const allTypes = Array.from(new Set(pokemonSlots.filter(p => p.hasArt && p.types).flatMap(p => p.types!)));
 
   // Check if any filters are active
-  const hasActiveFilters = searchTerm || selectedTypes.length > 0 || selectedArtists.length > 0 || uniqueOnly || evolutionFilter !== 'all' || userRatingFilter !== null || ratingSortOrder !== 'none';
+  const hasActiveFilters = searchTerm || selectedTypes.length > 0 || selectedArtists.length > 0 || uniqueOnly || evolutionFilter !== 'all' || userRatingFilter !== null || ratingSortOrder !== 'none' || showFavoritesOnly;
 
   // Filter pokemon based on current filters
   const filteredPokemon = pokemonSlots.filter(pokemon => {
@@ -1054,6 +1135,13 @@ const Home = () => {
       const deviceId = getDeviceId();
       const userRating = pokemonRatings[pokemon.firebaseId]?.ratings[deviceId];
       if (userRating !== userRatingFilter) {
+        return false;
+      }
+    }
+
+    // Favorites filter - show only favorited Pokemon
+    if (showFavoritesOnly && pokemon.firebaseId) {
+      if (!isPokemonFavorited(pokemon.firebaseId)) {
         return false;
       }
     }
@@ -1446,6 +1534,25 @@ const Home = () => {
                 )}
               </div>
               
+              {/* Favorites Filter */}
+              <div className="bg-red-500/20 backdrop-blur-md rounded-xl border border-red-500/30 p-2 animate-filter-item" style={{animationDelay: '0.85s'}}>
+                <button
+                  onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                  className={`w-full px-3 py-2 rounded-lg font-semibold text-sm transition-all ${
+                  showFavoritesOnly
+                    ? 'bg-red-500 text-white'
+                    : 'bg-white/20 text-white/80 hover:bg-white/30'
+                  }`}
+                >
+                  {showFavoritesOnly ? 'Hide Favorites' : 'Show Favorites'}
+                </button>
+                {showFavoritesOnly && (
+                  <p className="text-red-300 text-xs mt-1 text-center">
+                    Showing {userFavorites.length}/3 favorites
+                  </p>
+                )}
+              </div>
+              
               {/* Clear Filters */}
               {hasActiveFilters && (
                 <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2 animate-filter-item" style={{animationDelay: '0.8s'}}>
@@ -1458,8 +1565,7 @@ const Home = () => {
                       setEvolutionFilter('all');
                       setUserRatingFilter(null);
                       setRatingSortOrder('none');
-                      setShowTiers(false);
-                      setSelectedPokemon(null);
+                      setShowFavoritesOnly(false);
                     }}
                     className="w-full px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm"
                   >
@@ -1611,17 +1717,19 @@ const Home = () => {
                       isPositionEditorMode ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   />
-                  <button
-                    onClick={() => setIsPositionEditorMode(!isPositionEditorMode)}
-                    className={`px-2 py-1 rounded-lg font-semibold transition-all text-sm ${
-                      isPositionEditorMode
-                        ? 'bg-red-500 text-white hover:bg-red-600'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                    }`}
-                    title={isPositionEditorMode ? 'Exit Position Editor' : 'Edit Pokemon Positions'}
-                  >
-                    {isPositionEditorMode ? '✕' : '✏️'}
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setIsPositionEditorMode(!isPositionEditorMode)}
+                      className={`px-2 py-1 rounded-lg font-semibold transition-all text-sm ${
+                        isPositionEditorMode
+                          ? 'bg-red-500 text-white hover:bg-red-600'
+                          : 'bg-blue-500 text-white hover:bg-blue-600'
+                      }`}
+                      title={isPositionEditorMode ? 'Exit Position Editor' : 'Edit Pokemon Positions'}
+                    >
+                      {isPositionEditorMode ? '✕' : '✏️'}
+                    </button>
+                  )}
                 </div>
                 {isPositionEditorMode && (
                   <div className="mt-3 p-3 bg-blue-500/20 border border-blue-400/30 rounded-lg">
@@ -1652,6 +1760,18 @@ const Home = () => {
                       {notification.type === 'info' && <span className="text-2xl">ℹ️</span>}
                     </div>
                     <span className="font-medium">{notification.message}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Favorites Limit Popup */}
+              {showFavoritePopup && (
+                <div className="fixed top-4 right-4 px-6 py-4 rounded-lg shadow-2xl z-50 transform transition-all duration-500 ease-in-out animate-bounce bg-gradient-to-r from-red-500 to-red-600 text-white border border-white/20 backdrop-blur-sm">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0">
+                      <span className="text-2xl">✌️💔🥀</span>
+                    </div>
+                    <span className="font-medium">You've reached max 3 favorites!</span>
                   </div>
                 </div>
               )}
@@ -1745,6 +1865,32 @@ const Home = () => {
                           )}
                         </div>
                         
+                        {/* Favorite Heart Section - Moved to the left */}
+                        {pokemon.firebaseId && getPokemonFavoriteCount(pokemon.firebaseId) > 0 && (
+                          <div className="flex-shrink-0 flex flex-col items-center bg-red-500/5 border border-red-500/20 rounded-lg px-2 py-1 mx-2">
+                            <svg 
+                              className={`w-6 h-6 ${
+                                isPokemonFavorited(pokemon.firebaseId)
+                                  ? 'text-red-400 fill-current'
+                                  : 'text-white/60'
+                              }`} 
+                              fill={isPokemonFavorited(pokemon.firebaseId) ? 'currentColor' : 'none'} 
+                              stroke="currentColor" 
+                              strokeWidth={isPokemonFavorited(pokemon.firebaseId) ? 1 : 2}
+                              viewBox="0 0 24 24"
+                            >
+                              <path 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                              />
+                            </svg>
+                            <span className="text-white text-xs font-bold">
+                              {getPokemonFavoriteCount(pokemon.firebaseId)}
+                            </span>
+                          </div>
+                        )}
+
                         {/* Special Indicators */}
                         <div className="flex-shrink-0 flex flex-col items-end space-y-1">
                           {/* Position Editor Drag Indicator */}
@@ -1761,25 +1907,28 @@ const Home = () => {
                             </div>
                           )}
                           {pokemon.firebaseId && (
-                            globalRankings[pokemon.firebaseId] ? (
-                              <div className="flex items-center gap-1">
-                                <span className="bg-yellow-200 text-xs font-bold px-1.5 py-0.5 rounded">
-                                  {pokemonRatings[pokemon.firebaseId]?.averageRating 
-                                    ? `${pokemonRatings[pokemon.firebaseId].averageRating.toFixed(1)}★` 
-                                    : '0.0★'}
+                            <div className="flex items-center gap-1">
+                              {/* Star Rating and Ranking */}
+                              {globalRankings[pokemon.firebaseId] ? (
+                                <>
+                                  <span className="bg-yellow-200 text-xs font-bold px-1.5 py-0.5 rounded">
+                                    {pokemonRatings[pokemon.firebaseId]?.averageRating 
+                                      ? `${pokemonRatings[pokemon.firebaseId].averageRating.toFixed(1)}★` 
+                                      : '0.0★'}
+                                  </span>
+                                  <span className="bg-yellow-500 text-black px-1.5 py-0.5 rounded text-xs font-bold min-w-[2.4rem] text-center">
+                                    #{globalRankings[pokemon.firebaseId]}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="bg-gray-500 text-white px-1.5 py-0.5 rounded text-xs font-bold min-w-[2.5rem] text-center">
+                                  Unranked
                                 </span>
-                                <span className="bg-yellow-500 text-black px-1.5 py-0.5 rounded text-xs font-bold">
-                                  #{globalRankings[pokemon.firebaseId]}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="bg-gray-500 text-white px-1.5 py-0.5 rounded text-xs font-bold">
-                                Unranked
-                              </span>
-                            )
+                              )}
+                            </div>
                           )}
                           {pokemon.evolutionStage !== undefined && (
-                            <span className={`px-1.5 py-0.5 rounded text-xs font-bold text-white ${
+                            <span className={`px-1.5 py-0.5 rounded text-xs font-bold text-white min-w-[5rem] text-center ${
                               pokemon.evolutionStage === 0 ? 'bg-green-500' :
                               pokemon.evolutionStage === 1 ? 'bg-yellow-500' :
                               pokemon.evolutionStage === 2 ? 'bg-red-500' :
@@ -1865,13 +2014,49 @@ const Home = () => {
                 
                 {selectedPokemon && selectedPokemon.hasArt ? (
                   <div className="space-y-2">
+                    {/* Favorite Button - Top Left Corner, positioned absolutely */}
+                    {selectedPokemon.firebaseId && (
+                      <div className="absolute top-3 left-3 z-20">
+                        <button
+                          onClick={() => handleFavoriteToggle(selectedPokemon.firebaseId!)}
+                          className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 backdrop-blur-sm border ${
+                            isPokemonFavorited(selectedPokemon.firebaseId!)
+                              ? 'bg-red-500/20 border-red-500/40 text-red-300 hover:bg-red-500/30'
+                              : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20 hover:text-white'
+                          }`}
+                          title={isPokemonFavorited(selectedPokemon.firebaseId!) ? 'Remove from favorites' : 'Add to favorites'}
+                        >
+                          <svg 
+                            className={`w-7 h-7 transition-all duration-200 ${
+                              isPokemonFavorited(selectedPokemon.firebaseId!)
+                                ? 'text-red-400 fill-current'
+                                : 'text-white/70'
+                            }`} 
+                            fill={isPokemonFavorited(selectedPokemon.firebaseId!) ? 'currentColor' : 'none'} 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              strokeWidth={2} 
+                              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                            />
+                          </svg>
+                          <span className="text-base font-medium">
+                            {getPokemonFavoriteCount(selectedPokemon.firebaseId!)}
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                    
                     {/* Large Image with 3D Effect and Navigation */}
-                    <div className="w-full mx-auto perspective-1000 flex items-center justify-center relative">
-                      {/* Previous Arrow */}
+                    <div className="w-full mx-auto perspective-1000 relative">
+                      {/* Previous Arrow - Fixed Position */}
                       <button
                         onClick={navigatePrevious}
                         disabled={!selectedPokemon || sortedPokemon.findIndex(p => p.id === selectedPokemon.id) === 0}
-                        className="absolute left-0 top-1/2 transform -translate-y-1/2 z-10 bg-white/20 hover:bg-white/30 disabled:bg-gray-500/20 disabled:cursor-not-allowed backdrop-blur-md rounded-full p-3 transition-all duration-200 group"
+                        className="absolute left-0 top-[200px] z-10 bg-white/20 hover:bg-white/30 disabled:bg-gray-500/20 disabled:cursor-not-allowed backdrop-blur-md rounded-full p-3 transition-all duration-200 group"
                         title="Previous Pokemon (Left Arrow)"
                       >
                         <svg className="w-6 h-6 text-white group-disabled:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1879,91 +2064,93 @@ const Home = () => {
                         </svg>
                       </button>
 
-                      {/* Main Image Container */}
-                      <div 
-                        ref={imageRef}
-                        onMouseMove={handleMouseMove}
-                        onMouseLeave={handleMouseLeave}
-                        className="relative w-full max-w-xl group cursor-pointer mx-16"
-                        style={{ 
-                          perspective: '1000px',
-                        }}
-                      >
-                        {/* Circular Shadow Layer */}
-                        <div 
-                          className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-2 w-3/4 h-4 bg-black/40 rounded-full blur-md opacity-60 group-hover:opacity-80 transition-all duration-300"
-                        ></div>
-                        
-                        {/* Main Image */}
-                        <div
-                          className="relative w-full rounded-lg overflow-hidden transform-gpu transition-transform duration-300 ease-out group-hover:scale-105"
-                          style={{
-                            transform: `rotateX(${imageTransform.rotateX}deg) rotateY(${imageTransform.rotateY}deg)`,
-                            transformStyle: 'preserve-3d',
-                          }}
-                        >
-                          <img
-                            src={getDisplayedImageUrl()}
-                            alt={selectedPokemon.name}
-                            className="w-full h-auto object-contain max-h-[32rem]"
-                          />
-                        </div>
-                        
-                        {/* Additional Image Buttons - Vertical layout, positioned absolutely far right */}
-                        {selectedPokemon.additionalImages && selectedPokemon.additionalImages.length > 0 && (
-                          <div className="absolute bottom-0 right-[-60px] flex flex-col gap-2 z-10">
-                            {/* Show main image button only if we're NOT currently viewing the main image */}
-                            {currentDisplayImage && (
-                              <button
-                                onClick={() => handleImageSwitch(selectedPokemon.imageUrl!)}
-                                className="w-12 h-12 rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-110 border-yellow-400/70 hover:border-yellow-300 shadow-md shadow-yellow-400/25"
-                                title="Main image"
-                              >
-                                <img
-                                  src={selectedPokemon.imageUrl}
-                                  alt="Main"
-                                  className="w-full h-full object-cover"
-                                />
-                              </button>
-                            )}
-                            
-                            {/* Show additional image buttons only if they're NOT currently displayed */}
-                            {selectedPokemon.additionalImages.map((imageUrl, index) => {
-                              // Only show this button if this image is NOT currently displayed
-                              if (currentDisplayImage === imageUrl) {
-                                return null;
-                              }
-
-                              return (
-                                <button
-                                  key={index}
-                                  onClick={() => handleImageSwitch(imageUrl)}
-                                  className="w-12 h-12 rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-110 border-white/40 hover:border-white/60"
-                                  title={`Additional image ${index + 1}`}
-                                >
-                                  <img
-                                    src={imageUrl}
-                                    alt={`Additional ${index + 1}`}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Next Arrow */}
+                      {/* Next Arrow - Fixed Position */}
                       <button
                         onClick={navigateNext}
                         disabled={!selectedPokemon || sortedPokemon.findIndex(p => p.id === selectedPokemon.id) === sortedPokemon.length - 1}
-                        className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-white/20 hover:bg-white/30 disabled:bg-gray-500/20 disabled:cursor-not-allowed backdrop-blur-md rounded-full p-3 transition-all duration-200 group"
+                        className="absolute right-0 top-[200px] z-10 bg-white/20 hover:bg-white/30 disabled:bg-gray-500/20 disabled:cursor-not-allowed backdrop-blur-md rounded-full p-3 transition-all duration-200 group"
                         title="Next Pokemon (Right Arrow)"
                       >
                         <svg className="w-6 h-6 text-white group-disabled:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                       </button>
+
+                      {/* Main Image Container */}
+                      <div className="flex items-center justify-center">
+                        <div 
+                          ref={imageRef}
+                          onMouseMove={handleMouseMove}
+                          onMouseLeave={handleMouseLeave}
+                          className="relative w-full max-w-xl group cursor-pointer mx-16"
+                          style={{ 
+                            perspective: '1000px',
+                          }}
+                        >
+                          {/* Circular Shadow Layer */}
+                          <div 
+                            className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-2 w-3/4 h-4 bg-black/40 rounded-full blur-md opacity-60 group-hover:opacity-80 transition-all duration-300"
+                          ></div>
+                          
+                          {/* Main Image */}
+                          <div
+                            className="relative w-full rounded-lg overflow-hidden transform-gpu transition-transform duration-300 ease-out group-hover:scale-105"
+                            style={{
+                              transform: `rotateX(${imageTransform.rotateX}deg) rotateY(${imageTransform.rotateY}deg)`,
+                              transformStyle: 'preserve-3d',
+                            }}
+                          >
+                            <img
+                              src={getDisplayedImageUrl()}
+                              alt={selectedPokemon.name}
+                              className="w-full h-auto object-contain max-h-[32rem]"
+                            />
+                          </div>
+                        
+                          {/* Additional Image Buttons - Vertical layout, positioned absolutely far right */}
+                          {selectedPokemon.additionalImages && selectedPokemon.additionalImages.length > 0 && (
+                            <div className="absolute bottom-0 right-[-60px] flex flex-col gap-2 z-10">
+                              {/* Show main image button only if we're NOT currently viewing the main image */}
+                              {currentDisplayImage && (
+                                <button
+                                  onClick={() => handleImageSwitch(selectedPokemon.imageUrl!)}
+                                  className="w-12 h-12 rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-110 border-yellow-400/70 hover:border-yellow-300 shadow-md shadow-yellow-400/25"
+                                  title="Main image"
+                                >
+                                  <img
+                                    src={selectedPokemon.imageUrl}
+                                    alt="Main"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </button>
+                              )}
+                              
+                              {/* Show additional image buttons only if they're NOT currently displayed */}
+                              {selectedPokemon.additionalImages.map((imageUrl, index) => {
+                                // Only show this button if this image is NOT currently displayed
+                                if (currentDisplayImage === imageUrl) {
+                                  return null;
+                                }
+
+                                return (
+                                  <button
+                                    key={index}
+                                    onClick={() => handleImageSwitch(imageUrl)}
+                                    className="w-12 h-12 rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-110 border-white/40 hover:border-white/60"
+                                    title={`Additional image ${index + 1}`}
+                                  >
+                                    <img
+                                      src={imageUrl}
+                                      alt={`Additional ${index + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     
                     {/* Pokemon Number */}

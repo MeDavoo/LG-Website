@@ -5,6 +5,7 @@ import {
   addDoc, 
   updateDoc, 
   deleteDoc, 
+  deleteField,
   query, 
   orderBy, 
   where
@@ -17,6 +18,7 @@ export interface ChallengeArt {
   name: string;
   creator?: string; // Optional for body-completion challenges
   imageUrl: string;
+  additionalImages?: string[]; // Array of up to 3 additional image URLs
   types: string[];
   challenge: string; // Challenge type ID (alt-evo, fusions, etc.)
   createdAt: Date;
@@ -120,6 +122,50 @@ export const uploadPokemonImage = async (file: File, artName: string, pokemonNum
   }
 };
 
+// Upload additional images for challenge art
+export const uploadAdditionalChallengeImages = async (files: File[], artName: string): Promise<string[]> => {
+  try {
+    console.log('Uploading additional challenge images to Cloudinary...');
+    
+    const uploadPromises = files.map(async (file, index) => {
+      const timestamp = Date.now();
+      const sanitizedName = artName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      const publicId = `challenges/additional/${sanitizedName}-additional-${index + 1}-${timestamp}`;
+      
+      // Create form data for Cloudinary upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', CLOUDINARY_CONFIG.UPLOAD_PRESET);
+      formData.append('public_id', publicId);
+      formData.append('folder', 'challenges/additional');
+      
+      // Upload to Cloudinary
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.CLOUD_NAME}/image/upload`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Cloudinary upload failed: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      return result.secure_url;
+    });
+    
+    const uploadedUrls = await Promise.all(uploadPromises);
+    console.log('Additional images upload successful:', uploadedUrls);
+    
+    return uploadedUrls.filter(url => url !== null); // Filter out any null results
+  } catch (error) {
+    console.error('Detailed additional images upload error:', error);
+    return [];
+  }
+};
+
 // Get all challenge art from Firebase
 export const getAllChallengeArt = async (): Promise<ChallengeArt[]> => {
   try {
@@ -158,10 +204,16 @@ export const addChallengeArt = async (art: Omit<ChallengeArt, 'id' | 'createdAt'
 export const updateChallengeArt = async (id: string, updates: Partial<ChallengeArt>): Promise<boolean> => {
   try {
     const artRef = doc(db, COLLECTION_NAME, id);
-    await updateDoc(artRef, {
-      ...updates,
-      updatedAt: new Date(),
-    });
+    
+    // Handle the case where additionalImages is an empty array - remove the field entirely
+    const updateData: any = { ...updates, updatedAt: new Date() };
+    
+    if (updates.additionalImages !== undefined && updates.additionalImages.length === 0) {
+      // Remove the field entirely when empty
+      updateData.additionalImages = deleteField();
+    }
+    
+    await updateDoc(artRef, updateData);
     return true;
   } catch (error) {
     console.error('Error updating challenge art:', error);

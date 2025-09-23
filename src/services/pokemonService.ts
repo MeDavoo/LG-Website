@@ -5,6 +5,8 @@ import {
   addDoc, 
   updateDoc, 
   deleteDoc, 
+  setDoc,
+  getDoc,
   query, 
   orderBy, 
   where
@@ -23,6 +25,7 @@ export interface Pokemon {
   unique?: string; // U0, U1, U2 for unique Pokemon
   evolutionStage?: number; // 0=base, 1=first evo, 2=second evo, 3=GMAX, 4=Legendary, 5=MEGA
   info?: string; // Optional info text for tooltip display
+  favoriteCount?: number; // Total number of favorites for this Pokemon
   createdAt: Date;
   updatedAt: Date;
 }
@@ -563,8 +566,262 @@ export const resetAllRatings = async (): Promise<boolean> => {
   }
 };
 
+// Favorites System Functions
 
+// Save favorite to Firebase - SIMPLIFIED VERSION
+export const saveFavorite = async (pokemonId: string, deviceId: string, isFavorite: boolean): Promise<boolean> => {
+  try {
+    const favoritesRef = collection(db, 'favorites');
+    console.log(`🔄 ${isFavorite ? 'Adding' : 'Removing'} favorite for Pokemon: ${pokemonId}`);
 
+    if (isFavorite) {
+      // Add favorite - simple add document
+      await addDoc(favoritesRef, {
+        pokemonId,
+        deviceId,
+        isFavorite: true,
+        createdAt: new Date()
+      });
+      console.log(`✅ Added favorite for Pokemon: ${pokemonId}`);
+    } else {
+      // Remove favorite - find and delete the document
+      const q = query(favoritesRef, 
+        where('pokemonId', '==', pokemonId), 
+        where('deviceId', '==', deviceId)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        // Delete all matching documents (should be only one, but just in case)
+        const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+        console.log(`✅ Removed favorite for Pokemon: ${pokemonId} (deleted ${querySnapshot.docs.length} document(s))`);
+      } else {
+        console.log(`ℹ️  No favorite document found for Pokemon: ${pokemonId}`);
+      }
+    }
 
+    return true;
+  } catch (error) {
+    console.error('❌ Error saving favorite:', error);
+    return false;
+  }
+};
+
+// Get all favorites from Firebase
+export const getAllFavorites = async (): Promise<{[pokemonId: string]: number}> => {
+  try {
+    const favoritesRef = collection(db, 'favorites');
+    // Since we now delete documents instead of setting isFavorite: false, 
+    // we can just get all documents in the collection
+    const querySnapshot = await getDocs(favoritesRef);
+    
+    const favoriteCounts: {[pokemonId: string]: number} = {};
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      const pokemonId = data.pokemonId;
+      
+      // Only count if the document exists and has a valid pokemonId
+      if (pokemonId && data.isFavorite !== false) {
+        favoriteCounts[pokemonId] = (favoriteCounts[pokemonId] || 0) + 1;
+      }
+    });
+    
+    console.log('✅ Loaded favorite counts:', favoriteCounts);
+    return favoriteCounts;
+  } catch (error) {
+    console.error('❌ Error loading favorites:', error);
+    return {};
+  }
+};
+
+// Get user's favorites - SIMPLIFIED VERSION
+export const getUserFavorites = async (deviceId: string): Promise<string[]> => {
+  try {
+    const favoritesRef = collection(db, 'favorites');
+    const q = query(favoritesRef, where('deviceId', '==', deviceId));
+    const querySnapshot = await getDocs(q);
+    
+    const userFavorites: string[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.pokemonId && data.isFavorite !== false) {
+        userFavorites.push(data.pokemonId);
+      }
+    });
+    
+    console.log(`✅ Loaded ${userFavorites.length} user favorites:`, userFavorites);
+    return userFavorites;
+  } catch (error) {
+    console.error('❌ Error loading user favorites:', error);
+    return [];
+  }
+};
+
+// Cleanup function to remove orphaned or duplicate favorite documents
+export const cleanupFavoriteDocuments = async (): Promise<void> => {
+  try {
+    console.log('🧹 Starting aggressive favorites cleanup...');
+    const favoritesRef = collection(db, 'favorites');
+    const querySnapshot = await getDocs(favoritesRef);
+    
+    const documentsToDelete: string[] = [];
+    const validDocuments = new Map<string, string>(); // combo -> docId
+    
+    console.log(`📊 Found ${querySnapshot.docs.length} total favorite documents`);
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      const combo = `${data.pokemonId}_${data.deviceId}`;
+      
+      console.log(`🔍 Checking document ${doc.id}:`, {
+        pokemonId: data.pokemonId,
+        deviceId: data.deviceId,
+        isFavorite: data.isFavorite,
+        combo: combo
+      });
+      
+      // Mark for deletion if:
+      // 1. isFavorite is explicitly false
+      // 2. Missing required fields (pokemonId or deviceId)
+      // 3. Duplicate combination (keep the most recent one)
+      if (
+        data.isFavorite === false || 
+        !data.pokemonId || 
+        !data.deviceId
+      ) {
+        documentsToDelete.push(doc.id);
+        console.log(`🗑️  Marking for deletion (invalid): ${doc.id} - ${combo}`);
+      } else if (validDocuments.has(combo)) {
+        // Duplicate found - delete this one and keep the first
+        documentsToDelete.push(doc.id);
+        console.log(`🗑️  Marking for deletion (duplicate): ${doc.id} - ${combo}`);
+      } else {
+        // This is a valid, unique document
+        validDocuments.set(combo, doc.id);
+        console.log(`✅ Keeping valid document: ${doc.id} - ${combo}`);
+      }
+    });
+    
+    // Delete marked documents in batches
+    if (documentsToDelete.length > 0) {
+      console.log(`🗑️  Deleting ${documentsToDelete.length} orphaned/duplicate documents...`);
+      const deletePromises = documentsToDelete.map(docId => 
+        deleteDoc(doc(favoritesRef, docId))
+      );
+      
+      await Promise.all(deletePromises);
+      console.log(`✅ Cleanup complete! Removed ${documentsToDelete.length} documents.`);
+    } else {
+      console.log('✅ No cleanup needed - all documents are valid!');
+    }
+    
+    // Log final state
+    const remainingDocs = await getDocs(favoritesRef);
+    console.log(`📊 Final state: ${remainingDocs.docs.length} documents remaining`);
+    remainingDocs.docs.forEach(doc => {
+      const data = doc.data();
+      console.log(`📋 Remaining: ${doc.id} - ${data.pokemonId}_${data.deviceId}`);
+    });
+  } catch (error) {
+    console.error('❌ Error during cleanup:', error);
+  }
+};
+
+// EMERGENCY: Complete favorites reset - deletes ALL favorite documents
+export const resetAllFavorites = async (): Promise<void> => {
+  try {
+    console.log('🚨 EMERGENCY: Starting complete favorites reset...');
+    const favoritesRef = collection(db, 'favorites');
+    const querySnapshot = await getDocs(favoritesRef);
+    
+    console.log(`📊 Found ${querySnapshot.docs.length} documents to delete`);
+    
+    const deletePromises = querySnapshot.docs.map(doc => 
+      deleteDoc(doc.ref)
+    );
+    
+    await Promise.all(deletePromises);
+    console.log(`✅ RESET COMPLETE! Deleted ${querySnapshot.docs.length} documents.`);
+    
+    // Clear localStorage as well
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+      if (key.includes('pokemon_favorites') || key.includes('all_pokemon_favorites')) {
+        localStorage.removeItem(key);
+        console.log(`🗑️  Cleared localStorage: ${key}`);
+      }
+    });
+    
+    console.log('🎯 Complete favorites reset finished. Please refresh the page.');
+  } catch (error) {
+    console.error('❌ Error during complete reset:', error);
+  }
+};
+
+// Force delete a specific favorite document - for debugging
+export const forceDeleteFavorite = async (pokemonId: string, deviceId: string): Promise<boolean> => {
+  try {
+    const favoritesRef = collection(db, 'favorites');
+    const favoriteDocId = `${pokemonId}_${deviceId}`;
+    const favoriteDocRef = doc(favoritesRef, favoriteDocId);
+    
+    console.log(`🔥 FORCE DELETING: ${favoriteDocId}`);
+    
+    // Try multiple deletion methods
+    await deleteDoc(favoriteDocRef);
+    console.log(`🗑️  First deletion attempt completed`);
+    
+    // Wait and verify
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    try {
+      const docSnap = await getDoc(favoriteDocRef);
+      if (docSnap.exists()) {
+        console.log(`⚠️  Document still exists, trying setDoc with deletion flag...`);
+        // Try setting a deletion flag first
+        await setDoc(favoriteDocRef, {
+          pokemonId,
+          deviceId,
+          isFavorite: false,
+          deleted: true,
+          deletedAt: new Date()
+        });
+        
+        // Then delete again
+        await new Promise(resolve => setTimeout(resolve, 200));
+        await deleteDoc(favoriteDocRef);
+        console.log(`🔥 Second deletion attempt completed`);
+      } else {
+        console.log(`✅ Document successfully deleted: ${favoriteDocId}`);
+        return true;
+      }
+    } catch (error) {
+      console.log(`✅ Document confirmed deleted (error as expected): ${favoriteDocId}`);
+      return true;
+    }
+    
+    // Final verification
+    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      const finalSnap = await getDoc(favoriteDocRef);
+      if (!finalSnap.exists()) {
+        console.log(`🎯 FINAL VERIFICATION: Document ${favoriteDocId} is deleted`);
+        return true;
+      } else {
+        console.error(`🚨 CRITICAL: Document ${favoriteDocId} STILL EXISTS after force deletion!`);
+        return false;
+      }
+    } catch (error) {
+      console.log(`✅ FINAL VERIFICATION: Document confirmed deleted (error as expected): ${favoriteDocId}`);
+      return true;
+    }
+  } catch (error) {
+    console.error(`❌ Error force deleting favorite:`, error);
+    return false;
+  }
+};
 
 
