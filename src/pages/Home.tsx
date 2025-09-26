@@ -1018,6 +1018,27 @@ const Home = () => {
   const [ratingSortOrder, setRatingSortOrder] = useState<'none' | 'ascending' | 'descending'>('none'); // Sort by global ranking
   const [showTiers, setShowTiers] = useState(true); // Toggle tier letters display
 
+  // Mobile filter modal state
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  // Function to handle opening mobile filters with animation
+  const openMobileFilters = () => {
+    setShowMobileFilters(true);
+    // Small delay to allow DOM to update, then start animation
+    setTimeout(() => {
+      setMobileFiltersOpen(true);
+    }, 10);
+  };
+
+  // Function to handle closing mobile filters with animation
+  const closeMobileFilters = () => {
+    setMobileFiltersOpen(false);
+    setTimeout(() => {
+      setShowMobileFilters(false);
+    }, 300); // Match the animation duration
+  };
+
   // Collapsible filter sections state (with localStorage persistence)
   const [collapsedSections, setCollapsedSections] = useState<{
     types: boolean;
@@ -1263,11 +1284,24 @@ const Home = () => {
       
       {!loading && (
         <>
+          {/* Mobile Filter Button - Only visible on mobile */}
+          <div className="md:hidden mb-4 px-4">
+            <button
+              onClick={openMobileFilters}
+              className="w-full bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-3 text-white font-semibold hover:bg-white/20 transition-colors flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              Filters & Search
+            </button>
+          </div>
+
           {/* Main Layout: Filters | Pokemon List | Detail Panel */}
           <div className="grid grid-cols-12 gap-4" style={{height: 'calc(100vh - 80px)'}}>
             
-            {/* Left Panel - Filters */}
-            <div className="col-span-2 space-y-2 h-full custom-scrollbar animate-slide-in-left">
+            {/* Left Panel - Filters (HIDDEN ON MOBILE) */}
+            <div className="hidden md:block md:col-span-2 space-y-2 h-full custom-scrollbar animate-slide-in-left">
               <div className="overflow-y-auto space-y-2" style={{maxHeight: 'calc(100vh - 80px)'}}>
               
               {/* Filters Title */}
@@ -1688,8 +1722,8 @@ const Home = () => {
               </div>
             </div>
             
-            {/* Middle Panel - Search + Pokemon List */}
-            <div className="col-span-6 h-full flex flex-col animate-slide-in-top">
+            {/* Middle Panel - Search + Pokemon List (HIDDEN ON MOBILE) */}
+            <div className="hidden md:flex md:col-span-6 h-full flex-col animate-slide-in-top">
               
               {/* Pokemon List Title */}
               <div className="text-center flex-shrink-0 mt-2">
@@ -2009,8 +2043,8 @@ const Home = () => {
               </div>
             </div>
             
-            {/* Right Panel - Pokemon Detail */}
-            <div className="col-span-4 space-y-2 h-full custom-scrollbar animate-slide-in-right">
+            {/* Right Panel - Pokemon Detail (FULL WIDTH ON MOBILE) */}
+            <div className="col-span-12 md:col-span-4 space-y-2 h-full custom-scrollbar animate-slide-in-right">
               <div className="overflow-y-auto" style={{maxHeight: 'calc(100vh - 80px)'}}>
               
               {/* Details Title */}
@@ -2222,19 +2256,19 @@ const Home = () => {
                     </p>
                     
                     {/* Star Rating System */}
-                    <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10">
-                      <div className="flex justify-center items-center space-x-1 mb-2">
+                    <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/10">
+                      <div className="flex justify-center items-center flex-wrap gap-1 mb-2">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
                           <button
                             key={star}
                             onClick={() => handleStarRating(selectedPokemon.firebaseId!, star)}
                             onMouseEnter={() => setHoveredStar(star)}
                             onMouseLeave={() => setHoveredStar(0)}
-                            className="p-1 transition-all duration-200 transform hover:scale-110"
+                            className="p-0.5 transition-all duration-200 transform hover:scale-110 flex-shrink-0"
                             title={`Rate ${star} star${star > 1 ? 's' : ''}`}
                           >
                             <svg
-                              className={`w-6 h-6 transition-all duration-200 ${
+                              className={`w-5 h-5 transition-all duration-200 ${
                                 star <= (hoveredStar || getUserRating(selectedPokemon.firebaseId!))
                                   ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(255,255,0,0.8)]'
                                   : 'text-gray-400'
@@ -2413,12 +2447,18 @@ const Home = () => {
                         const sortedStages = Object.keys(stageGroups).map(Number).sort((a, b) => a - b);
                         
                         // Determine if we need compact layout (more than 3 stages)
+                        // Dynamic layout based on screen size and number of stages
                         const isCompactLayout = sortedStages.length > 3;
+                        const isMobileCompact = sortedStages.length >= 3; // More aggressive on mobile
                         
                         return (
                           <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10">
                             <h4 className="text-white/80 text-sm font-semibold mb-3 text-center">Evolution Line</h4>
-                            <div className={`flex items-center justify-center ${isCompactLayout ? 'gap-1' : 'gap-4'}`}>
+                            <div className={`flex items-center justify-center ${
+                              isCompactLayout ? 'gap-1' : 'gap-4'
+                            } ${
+                              isMobileCompact ? 'md:gap-4' : ''
+                            }`}>
                               {sortedStages.map((stage, stageIndex) => (
                                 <div key={stage} className="flex items-center">
                                   {/* Evolution Stage Column */}
@@ -2428,7 +2468,14 @@ const Home = () => {
                                         key={evolution.id}
                                         onClick={() => setSelectedPokemon(evolution)}
                                         disabled={evolution.id === selectedPokemon.id}
-                                        className={`flex items-center ${isCompactLayout ? 'gap-1 px-2 py-1' : 'gap-2 px-3 py-2'} rounded-lg transition-all duration-200 min-w-0 ${
+                                        className={`flex items-center transition-all duration-200 min-w-0 ${
+                                          // Mobile-first responsive sizing
+                                          isMobileCompact 
+                                            ? 'gap-1 px-1 py-1 md:gap-2 md:px-3 md:py-2' 
+                                            : isCompactLayout 
+                                              ? 'gap-1 px-2 py-1' 
+                                              : 'gap-2 px-3 py-2'
+                                        } rounded-lg ${
                                           evolution.id === selectedPokemon.id
                                             ? 'bg-yellow-400/30 border border-yellow-400 cursor-default'
                                             : 'bg-white/10 border border-white/20 hover:bg-white/20 hover:border-white/40 hover:scale-[1.02] cursor-pointer'
@@ -2442,7 +2489,14 @@ const Home = () => {
                                           evolution.evolutionStage === 5 ? 'MEGA Form' : 'Unknown Form'
                                         } ${evolution.id === selectedPokemon.id ? '(Current)' : ''}`}
                                       >
-                                        <div className={`${isCompactLayout ? 'w-8 h-8' : 'w-10 h-10'} rounded-lg overflow-hidden border border-white/20 flex-shrink-0`}>
+                                        <div className={`rounded-lg overflow-hidden border border-white/20 flex-shrink-0 ${
+                                          // Mobile-first responsive image sizing
+                                          isMobileCompact 
+                                            ? 'w-6 h-6 md:w-10 md:h-10' 
+                                            : isCompactLayout 
+                                              ? 'w-8 h-8' 
+                                              : 'w-10 h-10'
+                                        }`}>
                                           <img
                                             src={evolution.imageUrl}
                                             alt={evolution.name}
@@ -2450,17 +2504,36 @@ const Home = () => {
                                           />
                                         </div>
                                         <div className="text-left min-w-0 flex-1">
-                                          <div className={`${isCompactLayout ? 'text-xs' : 'text-xs'} font-semibold ${
+                                          <div className={`font-semibold ${
+                                            // Mobile-first responsive text sizing
+                                            isMobileCompact 
+                                              ? 'text-xs md:text-xs' 
+                                              : 'text-xs'
+                                          } ${
                                             evolution.id === selectedPokemon.id ? 'text-yellow-300' : 'text-white'
                                           }`}>
                                             #{evolution.id.toString().padStart(3, '0')}
                                           </div>
-                                          <div className={`${isCompactLayout ? 'text-xs' : 'text-xs'} font-medium truncate ${isCompactLayout ? 'max-w-12' : 'max-w-16'} ${
+                                          <div className={`font-medium truncate ${
+                                            // Mobile-first responsive text and width sizing
+                                            isMobileCompact 
+                                              ? 'text-xs max-w-8 md:text-xs md:max-w-16' 
+                                              : isCompactLayout 
+                                                ? 'text-xs max-w-12' 
+                                                : 'text-xs max-w-16'
+                                          } ${
                                             evolution.id === selectedPokemon.id ? 'text-yellow-200' : 'text-white/90'
                                           }`}>
                                             {evolution.name}
                                           </div>
-                                          <div className={`inline-block ${isCompactLayout ? 'text-xs px-1 py-0.5' : 'text-xs px-1.5 py-0.5'} rounded font-bold text-white mt-0.5 ${
+                                          <div className={`inline-block rounded font-bold text-white mt-0.5 ${
+                                            // Mobile-first responsive badge sizing
+                                            isMobileCompact 
+                                              ? 'text-xs px-1 py-0.5 md:text-xs md:px-1.5 md:py-0.5' 
+                                              : isCompactLayout 
+                                                ? 'text-xs px-1 py-0.5' 
+                                                : 'text-xs px-1.5 py-0.5'
+                                          } ${
                                             evolution.evolutionStage === 0 ? 'bg-green-500' :
                                             evolution.evolutionStage === 1 ? 'bg-yellow-500' :
                                             evolution.evolutionStage === 2 ? 'bg-red-500' :
@@ -2468,7 +2541,8 @@ const Home = () => {
                                             evolution.evolutionStage === 4 ? 'bg-orange-500' :
                                             evolution.evolutionStage === 5 ? 'bg-pink-500' : 'bg-gray-500'
                                           }`}>
-                                            {isCompactLayout ? (
+                                            {/* Responsive stage labels */}
+                                            {(isMobileCompact || isCompactLayout) ? (
                                               evolution.evolutionStage === 0 ? 'S0' :
                                               evolution.evolutionStage === 1 ? 'S1' :
                                               evolution.evolutionStage === 2 ? 'S2' :
@@ -2489,9 +2563,15 @@ const Home = () => {
                                     ))}
                                   </div>
                                   
-                                  {/* Arrow between stages */}
+                                  {/* Arrow between stages - responsive sizing */}
                                   {stageIndex < sortedStages.length - 1 && (
-                                    <div className={`${isCompactLayout ? 'mx-1' : 'mx-2'} text-white/40 ${isCompactLayout ? 'text-sm' : 'text-xl'}`}>
+                                    <div className={`text-white/40 ${
+                                      isMobileCompact 
+                                        ? 'mx-0.5 text-sm md:mx-2 md:text-xl' 
+                                        : isCompactLayout 
+                                          ? 'mx-1 text-sm' 
+                                          : 'mx-2 text-xl'
+                                    }`}>
                                       →
                                     </div>
                                   )}
@@ -2583,16 +2663,144 @@ const Home = () => {
                 )}
               </div>
               
+              {/* Mobile Pokemon List - appears between detail and add button */}
+              <div className="md:hidden mt-4">
+                {/* Mobile List Header */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-3 mb-2 flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-white">
+                    {sortedPokemon.length} Pokemon {hasActiveFilters ? '(Filtered)' : ''}
+                  </h2>
+                  {hasActiveFilters && (
+                    <button
+                      onClick={() => {
+                        setSearchTerm('');
+                        setSelectedTypes([]);
+                        setSelectedArtists([]);
+                        setUniqueOnly(false);
+                        setEvolutionFilter('all');
+                        setUserRatingFilter(null);
+                        setRatingSortOrder('none');
+                        setShowFavoritesOnly(false);
+                      }}
+                      className="px-2 py-1 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-red-200 text-xs font-medium transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* Mobile Pokemon Grid */}
+                <div className="space-y-1 max-h-96 overflow-y-auto custom-scrollbar">
+                  {sortedPokemon.map((pokemon) => (
+                    <div key={pokemon.id} className={`flex items-center transition-all duration-300 ease-in-out ${showTiers ? 'gap-2' : 'gap-0'}`}>
+                      {/* Pokemon List Item */}
+                      <div
+                        data-pokemon-id={pokemon.id}
+                        onClick={() => {
+                          setSelectedPokemon(pokemon);
+                          setShowDeleteConfirm(false);
+                          setShowEditForm(false);
+                          setShowActionsDropdown(false);
+                        }}
+                        className={`flex items-center p-2 rounded-lg border transition-all duration-300 ease-in-out ${showTiers ? 'flex-1' : 'w-full'} ${
+                          selectedPokemon?.id === pokemon.id
+                            ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
+                            : pokemon.hasArt 
+                            ? (pokemon.evolutionStage === 4 
+                              ? 'bg-orange-200/10 border-orange-300/20 hover:bg-orange-200/20 hover:border-orange-300/30' 
+                              : 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40')
+                            : 'bg-white/5 border-white/10 hover:bg-white/10'
+                        } cursor-pointer`}
+                      >
+                        {/* Pokemon Number */}
+                        <div className="flex-shrink-0 w-8 text-center">
+                          <span className="text-white/80 font-bold text-xs">
+                            #{pokemon.id.toString().padStart(3, '0')}
+                          </span>
+                        </div>
+                        
+                        {/* Pokemon Image */}
+                        <div className="flex-shrink-0 w-10 h-10 ml-2 relative">
+                          {pokemon.hasArt ? (
+                            <img
+                              src={pokemon.imageUrl}
+                              alt={pokemon.name}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-white/10 rounded-lg flex items-center justify-center">
+                              <span className="text-white/40 text-lg">?</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Pokemon Info */}
+                        <div className="flex-1 ml-3">
+                          <h3 className="text-white font-semibold text-sm">
+                            {pokemon.name}
+                          </h3>
+                          {pokemon.hasArt && (
+                            <p className="text-white/60 text-xs">
+                              by {pokemon.artist}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Favorites and Rating on Mobile */}
+                        {pokemon.hasArt && pokemon.firebaseId && (
+                          <div className="flex items-center gap-2 mr-2">
+                            {/* Favorite Count */}
+                            {getPokemonFavoriteCount(pokemon.firebaseId) > 0 && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-red-400 text-xs">❤</span>
+                                <span className="text-white/60 text-xs">{getPokemonFavoriteCount(pokemon.firebaseId)}</span>
+                              </div>
+                            )}
+                            
+                            {/* Average Rating */}
+                            {pokemonRatings[pokemon.firebaseId]?.averageRating > 0 && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-blue-400 text-xs">⭐</span>
+                                <span className="text-white/60 text-xs">{pokemonRatings[pokemon.firebaseId].averageRating.toFixed(1)}</span>
+                              </div>
+                            )}
+                            
+                            {/* User Rating */}
+                            {getUserRating(pokemon.firebaseId) > 0 && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-yellow-400 text-xs">★</span>
+                                <span className="text-white/60 text-xs">{getUserRating(pokemon.firebaseId)}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Tier Image (Mobile) */}
+                      {showTiers && pokemon.hasArt && pokemon.firebaseId && pokemonRatings[pokemon.firebaseId]?.averageRating && (
+                        <div className="flex-shrink-0 w-8 h-8">
+                          <img
+                            src={getTierImagePath(getPokemonTier(pokemon.firebaseId))}
+                            alt={`Tier ${getPokemonTier(pokemon.firebaseId)}`}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Add New Pokemon Section */}
               <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-3 mt-2" style={{animationDelay: '0.6s'}}>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col space-y-3">
                   <div>
                     <h2 className="text-white font-bold text-lg">ADD NEW POKEMON</h2>
                     <p className="text-white/60 text-sm">Add a new Pokemon to your collection</p>
                   </div>
                   <button
                     onClick={() => requireAdmin(() => setShowAddForm(true))}
-                    className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold flex items-center space-x-2"
+                    className="w-full px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold flex items-center justify-center space-x-2"
                   >
                     <span className="text-xl">➕</span>
                     <span>Add Pokemon</span>
@@ -2605,6 +2813,304 @@ const Home = () => {
         </>
       )}
       </div>
+      
+      {/* Mobile Filters Modal - Slide in from left */}
+      {showMobileFilters && (
+        <div className={`fixed inset-0 bg-black/60 backdrop-blur-md z-50 md:hidden transition-opacity duration-300 ${
+          mobileFiltersOpen ? 'opacity-100' : 'opacity-0'
+        }`}>
+          <div className={`fixed left-0 top-0 h-full w-80 bg-gradient-to-br from-gray-900/95 via-gray-800/95 to-black/95 backdrop-blur-md border-r border-gray-300/20 overflow-y-auto transform transition-transform duration-300 ease-out ${
+            mobileFiltersOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-300/20">
+              <h2 className="text-xl font-bold text-white">Filters & Search</h2>
+              <button
+                onClick={closeMobileFilters}
+                className="text-white/60 hover:text-white text-2xl p-1 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Filter Content */}
+            <div className="p-4 space-y-2">
+              {/* Search Section */}
+              <div className="bg-black/20 backdrop-blur-md rounded-xl border border-gray-300/20 p-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <span className="text-white text-sm font-medium">Search Pokemon</span>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search by name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-3 py-2 bg-black/30 border border-gray-300/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-gray-300 text-sm"
+                />
+              </div>
+
+              {/* Quick Actions */}
+              <div className="text-center">
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedTypes([]);
+                      setSelectedArtists([]);
+                      setUniqueOnly(false);
+                      setEvolutionFilter('all');
+                      setUserRatingFilter(null);
+                      setRatingSortOrder('none');
+                      setShowFavoritesOnly(false);
+                    }}
+                    className="px-3 py-1 bg-red-500/80 text-white rounded-lg hover:bg-red-600/80 transition-colors text-xs font-semibold"
+                  >
+                    Clear All
+                  </button>
+                  <button
+                    onClick={closeMobileFilters}
+                    className="px-3 py-1 bg-green-500/80 text-white rounded-lg hover:bg-green-600/80 transition-colors text-xs font-semibold"
+                  >
+                    Apply & Close
+                  </button>
+                </div>
+              </div>
+              
+              {/* Types Filter */}
+              <div className="bg-black/20 backdrop-blur-md rounded-xl border border-gray-300/20 p-2">
+                <button
+                  onClick={() => toggleSection('types')}
+                  className="w-full flex items-center justify-between text-white text-sm font-medium mb-2 hover:text-white/80"
+                >
+                  <span>Filter by Types</span>
+                  <span className="text-xs">{collapsedSections.types ? '+' : '−'}</span>
+                </button>
+                {!collapsedSections.types && (
+                  <div className="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto">
+                    {allTypes.map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          setSelectedTypes(prev =>
+                            prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+                          );
+                        }}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                          selectedTypes.includes(type)
+                            ? `${getTypeColor(type)} text-white shadow-md`
+                            : 'bg-black/30 text-white/70 hover:bg-black/50'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                    {/* Unique filters */}
+                    {['U0', 'U1', 'U2'].map((unique) => (
+                      <button
+                        key={unique}
+                        onClick={() => {
+                          setSelectedTypes(prev =>
+                            prev.includes(unique) ? prev.filter(t => t !== unique) : [...prev, unique]
+                          );
+                        }}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                          selectedTypes.includes(unique)
+                            ? 'bg-purple-600 text-white shadow-md'
+                            : 'bg-black/30 text-white/70 hover:bg-black/50'
+                        }`}
+                      >
+                        {unique === 'U0' ? 'U0 (No Evo)' : unique === 'U1' ? 'U1 (1 Evo)' : 'U2 (2 Evos)'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Artists Filter */}
+              <div className="bg-black/20 backdrop-blur-md rounded-xl border border-gray-300/20 p-2">
+                <button
+                  onClick={() => toggleSection('artists')}
+                  className="w-full flex items-center justify-between text-white text-sm font-medium mb-2 hover:text-white/80"
+                >
+                  <span>Filter by Artists</span>
+                  <span className="text-xs">{collapsedSections.artists ? '+' : '−'}</span>
+                </button>
+                {!collapsedSections.artists && (
+                  <div className="space-y-1">
+                    {['DAVE', 'JOAO', 'GUTO'].map((artist) => (
+                      <button
+                        key={artist}
+                        onClick={() => {
+                          setSelectedArtists(prev =>
+                            prev.includes(artist) ? prev.filter(a => a !== artist) : [...prev, artist]
+                          );
+                        }}
+                        className={`w-full px-3 py-2 rounded text-xs font-medium transition-colors ${
+                          selectedArtists.includes(artist)
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-black/30 text-white/70 hover:bg-black/50'
+                        }`}
+                      >
+                        {artist}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Evolution Filter */}
+              <div className="bg-black/20 backdrop-blur-md rounded-xl border border-gray-300/20 p-2">
+                <button
+                  onClick={() => toggleSection('evolution')}
+                  className="w-full flex items-center justify-between text-white text-sm font-medium mb-2 hover:text-white/80"
+                >
+                  <span>Evolution Stages</span>
+                  <span className="text-xs">{collapsedSections.evolution ? '+' : '−'}</span>
+                </button>
+                {!collapsedSections.evolution && (
+                  <div className="space-y-1">
+                    {[
+                      { value: 'all', label: 'All Pokemon' },
+                      { value: 'stage0', label: 'Base Forms' },
+                      { value: 'stage1', label: 'First Evolution' },
+                      { value: 'stage2', label: 'Second Evolution' },
+                      { value: 'gmax', label: 'GMAX' },
+                      { value: 'mega', label: 'MEGA' },
+                      { value: 'legendary', label: 'Legendary' }
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => setEvolutionFilter(option.value as any)}
+                        className={`w-full px-3 py-2 rounded text-xs font-medium transition-colors ${
+                          evolutionFilter === option.value
+                            ? 'bg-purple-600 text-white shadow-md'
+                            : 'bg-black/30 text-white/70 hover:bg-black/50'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Rating & Sorting */}
+              <div className="bg-black/20 backdrop-blur-md rounded-xl border border-gray-300/20 p-2">
+                <button
+                  onClick={() => toggleSection('rating')}
+                  className="w-full flex items-center justify-between text-white text-sm font-medium mb-2 hover:text-white/80"
+                >
+                  <span>Ratings & Sorting</span>
+                  <span className="text-xs">{collapsedSections.rating ? '+' : '−'}</span>
+                </button>
+                {!collapsedSections.rating && (
+                  <div className="space-y-2">
+                    {/* Sorting Options */}
+                    <div>
+                      <p className="text-white/60 text-xs mb-1">Sort by Global Ranking:</p>
+                      <div className="space-y-1">
+                        {[
+                          { value: 'none', label: 'No Sorting (Pokedex Order)' },
+                          { value: 'ascending', label: 'Best to Worst (1st → Last)' },
+                          { value: 'descending', label: 'Worst to Best (Last → 1st)' }
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setRatingSortOrder(option.value as any)}
+                            className={`w-full px-2 py-1 rounded text-xs font-medium transition-colors ${
+                              ratingSortOrder === option.value
+                                ? 'bg-yellow-600 text-white shadow-md'
+                                : 'bg-black/30 text-white/70 hover:bg-black/50'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* User Rating Filter */}
+                    <div>
+                      <p className="text-white/60 text-xs mb-1">Show Only My {userRatingFilter || 'X'}/10 Ratings:</p>
+                      <div className="grid grid-cols-5 gap-1">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
+                          <button
+                            key={rating}
+                            onClick={() => setUserRatingFilter(userRatingFilter === rating ? null : rating)}
+                            className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
+                              userRatingFilter === rating
+                                ? 'bg-orange-600 text-white shadow-md'
+                                : 'bg-black/30 text-white/70 hover:bg-black/50'
+                            }`}
+                          >
+                            {rating}
+                          </button>
+                        ))}
+                      </div>
+                      {userRatingFilter && (
+                        <button
+                          onClick={() => setUserRatingFilter(null)}
+                          className="w-full mt-1 px-2 py-1 bg-red-500/80 text-white rounded text-xs hover:bg-red-600/80"
+                        >
+                          Clear Rating Filter
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Favorites Filter */}
+                    <div>
+                      <button
+                        onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                        className={`w-full px-3 py-2 rounded text-xs font-medium transition-colors ${
+                          showFavoritesOnly
+                            ? 'bg-pink-600 text-white shadow-md'
+                            : 'bg-black/30 text-white/70 hover:bg-black/50'
+                        }`}
+                      >
+                        {showFavoritesOnly ? 'Showing Only Favorites' : 'Show Favorites Only'}
+                      </button>
+                    </div>
+
+                    {/* Tier Display Toggle */}
+                    <div>
+                      <button
+                        onClick={() => setShowTiers(!showTiers)}
+                        className={`w-full px-3 py-2 rounded text-xs font-medium transition-colors ${
+                          showTiers
+                            ? 'bg-indigo-600 text-white shadow-md'
+                            : 'bg-white/20 text-white/70 hover:bg-white/30'
+                        }`}
+                      >
+                        {showTiers ? 'Hide Tier Letters' : 'Show Tier Letters'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* User Stats (if available) */}
+              {userRatingStats.totalRatings > 0 && (
+                <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-2">
+                  <p className="text-white text-sm font-medium mb-2">Your Rating Stats</p>
+                  <div className="text-xs text-white/70 space-y-1">
+                    <p>Average Rating: <span className="text-white font-semibold">{userRatingStats.averageRating.toFixed(1)}/10</span></p>
+                    <p>Total Ratings: <span className="text-white font-semibold">{userRatingStats.totalRatings}</span></p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Click overlay to close */}
+          <div 
+            className="absolute inset-0 -z-10"
+            onClick={closeMobileFilters}
+          />
+        </div>
+      )}
       
       {/* Footer */}
       <Footer />
