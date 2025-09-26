@@ -2448,33 +2448,40 @@ const Home = () => {
                         
                         // Determine if we need compact layout (more than 3 stages)
                         // Dynamic layout based on screen size and number of stages
-                        const isCompactLayout = sortedStages.length > 3;
+                        const isCompactLayout = sortedStages.length >= 3; // More aggressive: start compacting at 3+ stages
                         const isMobileCompact = sortedStages.length >= 3; // More aggressive on mobile
+                        const isUltraCompact = sortedStages.length >= 4; // Ultra compact for 4+ stages
                         
                         return (
                           <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10">
                             <h4 className="text-white/80 text-sm font-semibold mb-3 text-center">Evolution Line</h4>
                             <div className={`flex items-center justify-center ${
-                              isCompactLayout ? 'gap-1' : 'gap-4'
+                              isUltraCompact 
+                                ? 'gap-0.5 flex-wrap' // Ultra tight spacing and allow wrapping
+                                : isCompactLayout 
+                                  ? 'gap-1' 
+                                  : 'gap-4'
                             } ${
                               isMobileCompact ? 'md:gap-4' : ''
                             }`}>
                               {sortedStages.map((stage, stageIndex) => (
                                 <div key={stage} className="flex items-center">
                                   {/* Evolution Stage Column */}
-                                  <div className="flex flex-col gap-2">
+                                  <div className="flex flex-col gap-1">
                                     {stageGroups[stage].map((evolution) => (
                                       <button
                                         key={evolution.id}
                                         onClick={() => setSelectedPokemon(evolution)}
                                         disabled={evolution.id === selectedPokemon.id}
                                         className={`flex items-center transition-all duration-200 min-w-0 ${
-                                          // Mobile-first responsive sizing
-                                          isMobileCompact 
-                                            ? 'gap-1 px-1 py-1 md:gap-2 md:px-3 md:py-2' 
-                                            : isCompactLayout 
-                                              ? 'gap-1 px-2 py-1' 
-                                              : 'gap-2 px-3 py-2'
+                                          // Ultra compact sizing for 4+ stages
+                                          isUltraCompact
+                                            ? 'gap-1 px-1 py-1 text-xs'
+                                            : isMobileCompact 
+                                              ? 'gap-1 px-1 py-1 md:gap-2 md:px-3 md:py-2' 
+                                              : isCompactLayout 
+                                                ? 'gap-1 px-2 py-1' 
+                                                : 'gap-2 px-3 py-2'
                                         } rounded-lg ${
                                           evolution.id === selectedPokemon.id
                                             ? 'bg-yellow-400/30 border border-yellow-400 cursor-default'
@@ -2490,12 +2497,14 @@ const Home = () => {
                                         } ${evolution.id === selectedPokemon.id ? '(Current)' : ''}`}
                                       >
                                         <div className={`rounded-lg overflow-hidden border border-white/20 flex-shrink-0 ${
-                                          // Mobile-first responsive image sizing
-                                          isMobileCompact 
-                                            ? 'w-6 h-6 md:w-10 md:h-10' 
-                                            : isCompactLayout 
-                                              ? 'w-8 h-8' 
-                                              : 'w-10 h-10'
+                                          // Ultra compact image sizing
+                                          isUltraCompact
+                                            ? 'w-5 h-5'
+                                            : isMobileCompact 
+                                              ? 'w-6 h-6 md:w-10 md:h-10' 
+                                              : isCompactLayout 
+                                                ? 'w-8 h-8' 
+                                                : 'w-10 h-10'
                                         }`}>
                                           <img
                                             src={evolution.imageUrl}
@@ -2505,34 +2514,40 @@ const Home = () => {
                                         </div>
                                         <div className="text-left min-w-0 flex-1">
                                           <div className={`font-semibold ${
-                                            // Mobile-first responsive text sizing
-                                            isMobileCompact 
-                                              ? 'text-xs md:text-xs' 
-                                              : 'text-xs'
+                                            // Ultra compact text sizing
+                                            isUltraCompact
+                                              ? 'text-xs'
+                                              : isMobileCompact 
+                                                ? 'text-xs md:text-xs' 
+                                                : 'text-xs'
                                           } ${
                                             evolution.id === selectedPokemon.id ? 'text-yellow-300' : 'text-white'
                                           }`}>
                                             #{evolution.id.toString().padStart(3, '0')}
                                           </div>
                                           <div className={`font-medium truncate ${
-                                            // Mobile-first responsive text and width sizing
-                                            isMobileCompact 
-                                              ? 'text-xs max-w-8 md:text-xs md:max-w-16' 
-                                              : isCompactLayout 
-                                                ? 'text-xs max-w-12' 
-                                                : 'text-xs max-w-16'
+                                            // Ultra compact text and width sizing
+                                            isUltraCompact
+                                              ? 'text-xs max-w-6' // Very narrow for ultra compact
+                                              : isMobileCompact 
+                                                ? 'text-xs max-w-8 md:text-xs md:max-w-16' 
+                                                : isCompactLayout 
+                                                  ? 'text-xs max-w-12' 
+                                                  : 'text-xs max-w-16'
                                           } ${
                                             evolution.id === selectedPokemon.id ? 'text-yellow-200' : 'text-white/90'
                                           }`}>
                                             {evolution.name}
                                           </div>
                                           <div className={`inline-block rounded font-bold text-white mt-0.5 ${
-                                            // Mobile-first responsive badge sizing
-                                            isMobileCompact 
-                                              ? 'text-xs px-1 py-0.5 md:text-xs md:px-1.5 md:py-0.5' 
-                                              : isCompactLayout 
-                                                ? 'text-xs px-1 py-0.5' 
-                                                : 'text-xs px-1.5 py-0.5'
+                                            // Ultra compact badge sizing
+                                            isUltraCompact
+                                              ? 'text-xs px-0.5 py-0.5'
+                                              : isMobileCompact 
+                                                ? 'text-xs px-1 py-0.5 md:text-xs md:px-1.5 md:py-0.5' 
+                                                : isCompactLayout 
+                                                  ? 'text-xs px-1 py-0.5' 
+                                                  : 'text-xs px-1.5 py-0.5'
                                           } ${
                                             evolution.evolutionStage === 0 ? 'bg-green-500' :
                                             evolution.evolutionStage === 1 ? 'bg-yellow-500' :
