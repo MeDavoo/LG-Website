@@ -406,14 +406,15 @@ const Statistics = () => {
     return colors[type] || `rgba(184, 184, 168, ${opacity})`;
   };
 
-  // Chart data for overall type distribution
+  // Chart data for overall type distribution - sorted by count (biggest to smallest)
+  const sortedTypeEntries = Object.entries(typeCount).sort((a, b) => b[1] - a[1]);
   const typeChartData = {
-    labels: Object.keys(typeCount),
+    labels: sortedTypeEntries.map(([type]) => type),
     datasets: [
       {
         label: 'Pokemon Count',
-        data: Object.values(typeCount),
-        backgroundColor: Object.keys(typeCount).map(type => getTypeColor(type)),
+        data: sortedTypeEntries.map(([, count]) => count),
+        backgroundColor: sortedTypeEntries.map(([type]) => getTypeColor(type)),
         borderWidth: 2,
         borderColor: '#ffffff',
       },
@@ -588,7 +589,7 @@ const Statistics = () => {
             {/* Compact Legend on the Left */}
             <div className="flex-shrink-0 w-32 flex flex-col justify-center">
               <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                {Object.entries(typeCount).map(([type, count]) => (
+                {sortedTypeEntries.map(([type, count]) => (
                   <div key={type} className="flex items-center space-x-1">
                     <span 
                       className="w-3 h-3 rounded-sm flex-shrink-0"
