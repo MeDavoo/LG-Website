@@ -10,7 +10,7 @@ import {
   LineElement,
   PointElement
 } from 'chart.js';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Users, Image, Palette, TrendingUp, TrendingDown, Trophy } from 'lucide-react';
 import { getAllPokemon, Pokemon, getArtistRankings, getAllRatings, PokemonRating, getGlobalRankings } from '../services/pokemonService';
@@ -115,6 +115,44 @@ const Statistics = () => {
 
   // Count unique Pokemon (U0, U1, U2)
   const uniquePokemonCount = pokemonData.filter(p => p.unique && ['U0', 'U1', 'U2'].includes(p.unique)).length;
+
+  // Count unique voters (devices that have voted at least once)
+  const uniqueVoters = useMemo(() => {
+    const deviceIds = new Set<string>();
+    const pokemonWithRatings: string[] = [];
+    
+    // Debug: check if we have ratings data
+    if (Object.keys(pokemonRatings).length === 0) {
+      return 0;
+    }
+    
+    Object.entries(pokemonRatings).forEach(([pokemonId, rating]) => {
+      // Based on Firebase structure, ratings should contain individual rating objects
+      if (rating && rating.ratings) {
+        const pokemonDevices: string[] = [];
+        // rating.ratings is an object where keys are device IDs and values are rating numbers
+        Object.keys(rating.ratings).forEach(deviceId => {
+          if (deviceId && typeof deviceId === 'string' && deviceId !== 'averageRating' && deviceId !== 'totalVotes' && deviceId !== 'totalPoints') {
+            deviceIds.add(deviceId);
+            pokemonDevices.push(deviceId);
+          }
+        });
+        if (pokemonDevices.length > 0) {
+          pokemonWithRatings.push(`${pokemonId} (${pokemonDevices.length} devices)`);
+        }
+      }
+    });
+    
+    // Debug log with more details
+    console.log('=== UNIQUE VOTERS DEBUG ===');
+    console.log('Total unique voters found:', deviceIds.size);
+    console.log('Pokemon with ratings:', pokemonWithRatings);
+    console.log('All unique device IDs:', Array.from(deviceIds));
+    console.log('Sample rating structure:', Object.values(pokemonRatings)[0]);
+    console.log('=========================');
+    
+    return deviceIds.size;
+  }, [pokemonRatings]);
 
   // Evolution distribution
   const evolutionCount = {
@@ -539,7 +577,7 @@ const Statistics = () => {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
           <div className="flex items-center space-x-4">
             <div className="p-2 bg-blue-500/20 rounded-lg flex-shrink-0">
@@ -560,6 +598,18 @@ const Statistics = () => {
             <div className="flex items-center space-x-3">
               <div className="text-2xl font-bold text-white">{Object.keys(artistCount).length}</div>
               <div className="text-white/70 text-sm">Active Artists</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
+          <div className="flex items-center space-x-4">
+            <div className="p-2 bg-orange-500/20 rounded-lg flex-shrink-0">
+              <Users className="text-orange-400" size={20} />
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="text-2xl font-bold text-white">{uniqueVoters}</div>
+              <div className="text-white/70 text-sm">Unique Voters</div>
             </div>
           </div>
         </div>
