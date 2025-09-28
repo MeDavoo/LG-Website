@@ -4,6 +4,7 @@ import { deleteField } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
+import { clearAllCache, getCacheStats } from '../services/cacheService';
 
 interface PokemonSlot {
   id: number;
@@ -19,6 +20,7 @@ interface PokemonSlot {
   firebaseId?: string; // Firebase document ID for updates
   info?: string; // Optional info text that appears in tooltip
   favoriteCount?: number; // Total number of favorites for this Pokemon
+  artworkDate?: Date; // Date when the artwork was created
 }
 
 const Home = () => {
@@ -62,13 +64,18 @@ const Home = () => {
   const loadPokemonData = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Starting to load Pokemon data...');
       const firebasePokemon = await getAllPokemon();
+      console.log('📦 Retrieved Pokemon from Firebase:', firebasePokemon.length, 'Pokemon');
+      console.log('📋 First Pokemon:', firebasePokemon[0]);
       setPokemonData(firebasePokemon);
       
       // Create slots dynamically based on the highest pokedex number or Pokemon count
       const maxPokedexNumber = firebasePokemon.length > 0 
         ? Math.max(...firebasePokemon.map(p => p.pokedexNumber || 0))
         : 151; // Start with 151 as minimum for classic Pokedex feel
+      
+      console.log('📈 Max Pokedex Number:', maxPokedexNumber);
       
       const slots: PokemonSlot[] = [];
       for (let i = 1; i <= maxPokedexNumber; i++) {
@@ -89,7 +96,8 @@ const Home = () => {
             hasArt: true,
             firebaseId: pokemonFromFirebase.id,
             info: pokemonFromFirebase.info,
-            favoriteCount: favoriteCount
+            favoriteCount: favoriteCount,
+            artworkDate: pokemonFromFirebase.artworkDate || pokemonFromFirebase.createdAt || new Date()
           });
         } else {
           slots.push({
@@ -100,6 +108,8 @@ const Home = () => {
         }
       }
       
+      console.log('🎰 Created slots:', slots.length, 'total slots');
+      console.log('🎨 Pokemon with art:', slots.filter(s => s.hasArt).length);
       setPokemonSlots(slots);
       
       // Load user rating statistics AFTER setting slots
@@ -110,7 +120,7 @@ const Home = () => {
         setAnimationSpeedMultiplier(0.01);
       }
     } catch (error) {
-      console.error('Error loading Pokemon data:', error);
+      console.error('💥 Error loading Pokemon data:', error);
     } finally {
       setLoading(false);
     }
@@ -150,9 +160,14 @@ const Home = () => {
         ? userRatings.reduce((sum, rating) => sum + rating, 0) / userRatings.length 
         : 0;
       
+      // Calculate total unrated Pokemon (Pokemon with art that user hasn't rated)
+      const totalPokemonWithArt = currentSlots.filter(p => p.hasArt && p.firebaseId).length;
+      const totalUnrated = totalPokemonWithArt - userRatings.length;
+      
       setUserRatingStats({
         averageRating,
         totalRatings: userRatings.length,
+        totalUnrated,
         ratingDistribution
       });
     } catch (error) {
@@ -195,7 +210,8 @@ const Home = () => {
       evolutionStage: selectedPokemon.evolutionStage || 0,
       image: null, // Reset image field
       additionalImages: [], // Reset additional images field
-      info: selectedPokemon.info || ''
+      info: selectedPokemon.info || '',
+      artworkDate: selectedPokemon.artworkDate instanceof Date ? selectedPokemon.artworkDate : new Date()
     });
     setShowEditForm(true);
   };
@@ -256,6 +272,7 @@ const Home = () => {
         unique: editFormData.unique, // Always include unique field, even if empty string
         ...(imageUrl !== selectedPokemon.imageUrl && { imageUrl }), // Only update if image changed
         additionalImages: finalAdditionalImages, // Always update to reflect any additions or deletions
+        artworkDate: editFormData.artworkDate,
         updatedAt: new Date()
       };
 
@@ -282,7 +299,8 @@ const Home = () => {
           unique: editFormData.unique,
           imageUrl: imageUrl,
           additionalImages: finalAdditionalImages,
-          info: editFormData.info && editFormData.info.trim() ? editFormData.info.trim() : undefined
+          info: editFormData.info && editFormData.info.trim() ? editFormData.info.trim() : undefined,
+          artworkDate: editFormData.artworkDate
         } : null);
         
         await loadPokemonData(); // Refresh the data
@@ -329,6 +347,7 @@ const Home = () => {
         types: addFormData.types,
         imageUrl,
         evolutionStage: addFormData.evolutionStage,
+        artworkDate: addFormData.artworkDate,
         ...(addFormData.unique && { unique: addFormData.unique }),
         ...(addFormData.info && addFormData.info.trim() && { info: addFormData.info.trim() })
       };
@@ -346,7 +365,8 @@ const Home = () => {
         unique: '',
         evolutionStage: 0,
         image: null,
-        info: ''
+        info: '',
+        artworkDate: new Date()
       });
       
       // Reorganize Pokedex to ensure proper ordering (legendaries at bottom)
@@ -616,7 +636,8 @@ const Home = () => {
     evolutionStage: 0,
     image: null as File | null,
     additionalImages: [] as File[], // Up to 3 additional images
-    info: ''
+    info: '',
+    artworkDate: new Date()
   });
   const [addFormData, setAddFormData] = useState({
     name: '',
@@ -625,7 +646,8 @@ const Home = () => {
     unique: '',
     evolutionStage: 0,
     image: null as File | null,
-    info: ''
+    info: '',
+    artworkDate: new Date()
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -636,6 +658,9 @@ const Home = () => {
   const [draggedPokemon, setDraggedPokemon] = useState<PokemonSlot | null>(null);
   const [positionFeedback, setPositionFeedback] = useState<string>('');
   const [showPositionFeedback, setShowPositionFeedback] = useState(false);
+  
+  // Cache Management modal state
+  const [showCacheManagement, setShowCacheManagement] = useState(false);
   
   // Image switching state for additional images
   const [currentDisplayImage, setCurrentDisplayImage] = useState<string | null>(null);
@@ -999,6 +1024,35 @@ const Home = () => {
   const getPokemonFavoriteCount = (pokemonId: string): number => {
     return pokemonFavorites[pokemonId] || 0;
   };
+
+  // Delete all user data (favorites and ratings)
+  const deleteUserData = async () => {
+    try {
+      // Clear localStorage data
+      localStorage.removeItem('pokemon_device_id');
+      localStorage.removeItem('pokemon_ratings');
+      localStorage.removeItem('pokemon_filter_collapsed_sections');
+      
+      // Reset all state
+      setUserFavorites([]);
+      setPokemonFavorites({});
+      setPokemonRatings({});
+      setUserRatingStats({
+        averageRating: 0,
+        totalRatings: 0,
+        totalUnrated: pokemonSlots.filter(p => p.hasArt && p.firebaseId).length,
+        ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
+      });
+      
+      // Note: We don't need to delete from Firebase as the deviceId will be different
+      // when they interact again, effectively orphaning their old data
+      
+      showNotification('All your data has been deleted', 'info');
+    } catch (error) {
+      console.error('Error deleting user data:', error);
+      showNotification('Error deleting data', 'error');
+    }
+  };
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -1084,10 +1138,12 @@ const Home = () => {
   const [userRatingStats, setUserRatingStats] = useState<{
     averageRating: number;
     totalRatings: number;
+    totalUnrated: number;
     ratingDistribution: { [star: number]: number };
   }>({
     averageRating: 0,
     totalRatings: 0,
+    totalUnrated: 0,
     ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
   });
 
@@ -1169,12 +1225,21 @@ const Home = () => {
       return false; // Hide Pokemon without evolution stage data when filtering
     }
     
-    // User rating filter - show only Pokemon that the user voted with a specific star rating
+    // User rating filter - show only Pokemon that the user voted with a specific star rating or unrated Pokemon
     if (userRatingFilter !== null && pokemon.firebaseId) {
       const deviceId = getDeviceId();
       const userRating = pokemonRatings[pokemon.firebaseId]?.ratings[deviceId];
-      if (userRating !== userRatingFilter) {
-        return false;
+      
+      if (userRatingFilter === 0) {
+        // Show only unrated Pokemon (no rating from this user)
+        if (userRating) {
+          return false;
+        }
+      } else {
+        // Show only Pokemon rated with the specific star rating
+        if (userRating !== userRatingFilter) {
+          return false;
+        }
       }
     }
 
@@ -1263,6 +1328,51 @@ const Home = () => {
       Fairy: 'type-fairy',
     };
     return colors[type] || 'type-normal';
+  };
+
+  // Helper function to format date for input fields
+  const formatDateForInput = (date: Date | string | null | undefined): string => {
+    if (!date) return new Date().toISOString().split('T')[0];
+    
+    // If it's already a string in the correct format, return it
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return date;
+    }
+    
+    // Convert to Date object if it isn't already
+    const dateObj = date instanceof Date ? date : new Date(date);
+    
+    // Check if the date is valid
+    if (isNaN(dateObj.getTime())) {
+      return new Date().toISOString().split('T')[0];
+    }
+    
+    return dateObj.toISOString().split('T')[0];
+  };
+
+  // Helper function to safely format date for display
+  const formatDateForDisplay = (date: Date | string | null | undefined): string => {
+    if (!date) return 'Unknown';
+    
+    try {
+      // Convert to Date object if it isn't already
+      const dateObj = date instanceof Date ? date : new Date(date);
+      
+      // Check if the date is valid
+      if (isNaN(dateObj.getTime())) {
+        return 'Unknown';
+      }
+      
+      // Format as DD/MM/YYYY (international format) or use a clearer format
+      return dateObj.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date for display:', error);
+      return 'Unknown';
+    }
   };
 
   return (
@@ -1710,12 +1820,67 @@ const Home = () => {
                         </button>
                       </div>
                     ))}
+                    
+                    {/* Unrated Pokemon Button */}
+                    <div className="flex items-center justify-between text-xs border-t border-white/10 pt-2 mt-2">
+                      <div className="flex items-center">
+                        <span className="text-gray-300 w-4 text-center font-bold">0</span>
+                        <svg
+                          className="w-3 h-3 text-gray-300 ml-1"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-gray-300 ml-1 text-xs">Unrated</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (userRatingFilter === 0) {
+                            // If already filtering unrated, clear the filter
+                            setUserRatingFilter(null);
+                          } else {
+                            // Set filter to show unrated Pokemon
+                            setUserRatingFilter(0);
+                          }
+                        }}
+                        className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
+                          userRatingFilter === 0
+                            ? 'bg-orange-500 text-white'
+                            : userRatingStats.totalUnrated > 0
+                            ? 'bg-white/20 text-white/90 hover:bg-white/30'
+                            : 'bg-white/10 text-white/50 cursor-default'
+                        }`}
+                        disabled={userRatingStats.totalUnrated === 0}
+                        title={userRatingStats.totalUnrated > 0 ? `Show ${userRatingStats.totalUnrated} Pokemon you haven't rated yet` : `All Pokemon have been rated`}
+                      >
+                        {userRatingStats.totalUnrated}
+                      </button>
+                    </div>
                   </div>
                 )}
                 
                 {userRatingStats.totalRatings === 0 && (
                   <div className="text-center text-white/50 text-xs mt-2">
                     No ratings yet. Start rating each Pokemon!
+                  </div>
+                )}
+                
+                {/* Delete User Data Button - Only show if user has data */}
+                {(userRatingStats.totalRatings > 0 || userFavorites.length > 0) && (
+                  <div className="mt-3 pt-3 border-t border-white/10">
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Are you sure? This will permanently delete all your ratings and favorites. This action cannot be undone.')) {
+                          deleteUserData();
+                        }
+                      }}
+                      className="w-full px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white text-xs rounded transition-colors"
+                      title="Permanently delete all your ratings and favorites"
+                    >
+                      Delete My Data
+                    </button>
                   </div>
                 )}
               </div>
@@ -1770,17 +1935,26 @@ const Home = () => {
                     }`}
                   />
                   {isAdmin && (
-                    <button
-                      onClick={() => setIsPositionEditorMode(!isPositionEditorMode)}
-                      className={`px-2 py-1 rounded-lg font-semibold transition-all text-sm ${
-                        isPositionEditorMode
-                          ? 'bg-red-500 text-white hover:bg-red-600'
-                          : 'bg-blue-500 text-white hover:bg-blue-600'
-                      }`}
-                      title={isPositionEditorMode ? 'Exit Position Editor' : 'Edit Pokemon Positions'}
-                    >
-                      {isPositionEditorMode ? '✕' : '✏️'}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setIsPositionEditorMode(!isPositionEditorMode)}
+                        className={`px-2 py-1 rounded-lg font-semibold transition-all text-sm ${
+                          isPositionEditorMode
+                            ? 'bg-red-500 text-white hover:bg-red-600'
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
+                        title={isPositionEditorMode ? 'Exit Position Editor' : 'Edit Pokemon Positions'}
+                      >
+                        {isPositionEditorMode ? '✕' : '✏️'}
+                      </button>
+                      <button
+                        onClick={() => setShowCacheManagement(true)}
+                        className="px-2 py-1 rounded-lg font-semibold transition-all text-sm bg-purple-500 text-white hover:bg-purple-600"
+                        title="Cache Management"
+                      >
+                        🗄️
+                      </button>
+                    </div>
                   )}
                 </div>
                 {isPositionEditorMode && (
@@ -2250,10 +2424,19 @@ const Home = () => {
                       )}
                     </div>
                     
-                    {/* Artist */}
-                    <p className="text-white/80 text-center text-sm">
-                      Created by <span className="text-yellow-300 font-semibold">{selectedPokemon.artist}</span>
-                    </p>
+                    {/* Artist and Artwork Date */}
+                    <div className="text-white/80 text-center text-sm space-y-1">
+                      <p>
+                        Created by <span className="text-yellow-300 font-semibold">{selectedPokemon.artist}</span>
+                      </p>
+                      {selectedPokemon.artworkDate && (
+                        <p className="text-white/60 text-xs">
+                          <span className="text-blue-300 font-medium">
+                            {formatDateForDisplay(selectedPokemon.artworkDate)}
+                          </span>
+                        </p>
+                      )}
+                    </div>
                     
                     {/* Star Rating System */}
                     <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/10">
@@ -3114,6 +3297,24 @@ const Home = () => {
                     <p>Average Rating: <span className="text-white font-semibold">{userRatingStats.averageRating.toFixed(1)}/10</span></p>
                     <p>Total Ratings: <span className="text-white font-semibold">{userRatingStats.totalRatings}</span></p>
                   </div>
+                  
+                  {/* Delete User Data Button for mobile */}
+                  {(userRatingStats.totalRatings > 0 || userFavorites.length > 0) && (
+                    <div className="mt-2 pt-2 border-t border-white/20">
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Are you sure? This will permanently delete all your ratings and favorites. This action cannot be undone.')) {
+                            deleteUserData();
+                            closeMobileFilters();
+                          }
+                        }}
+                        className="w-full px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white text-xs rounded transition-colors"
+                        title="Permanently delete all your ratings and favorites"
+                      >
+                        Delete My Data
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -3376,6 +3577,29 @@ const Home = () => {
                 />
               </div>
 
+              {/* Artwork Date */}
+              <div>
+                <label className="block text-white font-semibold mb-2">
+                  Artwork Date *
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={formatDateForInput(editFormData.artworkDate)}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, artworkDate: new Date(e.target.value) }))}
+                    className="flex-1 px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setEditFormData(prev => ({ ...prev, artworkDate: new Date() }))}
+                    className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors"
+                    title="Set to today's date"
+                  >
+                    Today
+                  </button>
+                </div>
+              </div>
+
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
                 <button
@@ -3561,6 +3785,29 @@ const Home = () => {
                 />
               </div>
 
+              {/* Artwork Date */}
+              <div>
+                <label className="block text-white font-semibold mb-2">
+                  Artwork Date *
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={formatDateForInput(addFormData.artworkDate)}
+                    onChange={(e) => setAddFormData(prev => ({ ...prev, artworkDate: new Date(e.target.value) }))}
+                    className="flex-1 px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAddFormData(prev => ({ ...prev, artworkDate: new Date() }))}
+                    className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors"
+                    title="Set to today's date"
+                  >
+                    Today
+                  </button>
+                </div>
+              </div>
+
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
                 <button
@@ -3576,6 +3823,76 @@ const Home = () => {
                 >
                   {isUploading ? 'Adding...' : 'Add Pokemon'}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Cache Management Modal */}
+      {showCacheManagement && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[60] p-4">
+          <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                🗄️ Cache Management
+              </h2>
+              <button
+                onClick={() => setShowCacheManagement(false)}
+                className="text-white/60 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <p className="text-white/80 text-sm mb-4">
+                Manage cached data to optimize performance and troubleshoot loading issues.
+              </p>
+              
+              <div className="grid grid-cols-1 gap-3">
+                <button
+                  onClick={() => {
+                    const stats = getCacheStats();
+                    console.log('Cache Stats:', stats);
+                    showNotification(`Cached: ${stats.pokemonCached ? '✅' : '❌'} Pokemon, ${stats.ratingsCached ? '✅' : '❌'} Ratings | Size: ${Math.round(stats.cacheSize/1024)}KB`, 'info');
+                  }}
+                  className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                  title="Check cache status and size"
+                >
+                  View Cache Statistics
+                </button>
+                
+                <button
+                  onClick={() => {
+                    clearAllCache();
+                    showNotification('Cache cleared! Next load will fetch fresh data.', 'success');
+                  }}
+                  className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                  title="Clear all cached data to force fresh fetch"
+                >
+                  Clear All Cache
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    setShowCacheManagement(false);
+                    setLoading(true);
+                    clearAllCache();
+                    await loadPokemonData();
+                    showNotification('Data refreshed from Firebase!', 'success');
+                  }}
+                  className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                  title="Clear cache and refresh data immediately"
+                >
+                  Clear & Refresh Data
+                </button>
+              </div>
+              
+              <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/10">
+                <p className="text-white/60 text-xs">
+                  <strong>Tip:</strong> Use "Clear & Refresh" if you're experiencing loading issues or outdated data.
+                </p>
               </div>
             </div>
           </div>

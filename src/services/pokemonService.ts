@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
+import { getCachedPokemonData, getCachedRatingsData, updateLastModifiedTimestamp } from './cacheService';
 
 export interface Pokemon {
   id: string; // Firebase document ID
@@ -26,6 +27,7 @@ export interface Pokemon {
   evolutionStage?: number; // 0=base, 1=first evo, 2=second evo, 3=GMAX, 4=Legendary, 5=MEGA
   info?: string; // Optional info text for tooltip display
   favoriteCount?: number; // Total number of favorites for this Pokemon
+  artworkDate?: Date; // Date when the artwork was created
   createdAt: Date;
   updatedAt: Date;
 }
@@ -186,21 +188,36 @@ export const reorganizePokedex = async (): Promise<void> => {
 };
 
 // Get all Pokemon from Firebase
-export const getAllPokemon = async (): Promise<Pokemon[]> => {
+// Internal function to fetch Pokemon from Firebase (used by cache)
+const fetchPokemonFromFirebase = async (): Promise<Pokemon[]> => {
   try {
     const q = query(collection(db, COLLECTION_NAME), orderBy('pokedexNumber'));
     const querySnapshot = await getDocs(q);
     
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate() || new Date(),
-      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-    })) as Pokemon[];
+    return querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+        // Handle artworkDate safely - only convert if it exists and has toDate method, otherwise default to today
+        artworkDate: (data.artworkDate && typeof data.artworkDate.toDate === 'function') 
+          ? data.artworkDate.toDate() 
+          : (data.createdAt && typeof data.createdAt.toDate === 'function') 
+            ? data.createdAt.toDate() 
+            : new Date(),
+      } as Pokemon;
+    });
   } catch (error) {
     console.error('Error fetching Pokemon:', error);
     return [];
   }
+};
+
+// Public function with caching
+export const getAllPokemon = async (): Promise<Pokemon[]> => {
+  return getCachedPokemonData(fetchPokemonFromFirebase);
 };
 
 // Add a new Pokemon
@@ -212,6 +229,10 @@ export const addPokemon = async (pokemon: Omit<Pokemon, 'id' | 'createdAt' | 'up
       createdAt: now,
       updatedAt: now,
     });
+    
+    // Update last modified timestamp to invalidate cache
+    await updateLastModifiedTimestamp('pokemon_last_modified');
+    
     return docRef.id;
   } catch (error) {
     console.error('Error adding Pokemon:', error);
@@ -227,6 +248,10 @@ export const updatePokemon = async (id: string, updates: Partial<Pokemon>): Prom
       ...updates,
       updatedAt: new Date(),
     });
+    
+    // Update last modified timestamp to invalidate cache
+    await updateLastModifiedTimestamp('pokemon_last_modified');
+    
     return true;
   } catch (error) {
     console.error('Error updating Pokemon:', error);
@@ -279,6 +304,10 @@ export const deletePokemonWithImage = async (id: string, imageUrl: string): Prom
     
     // Then delete the Pokemon document
     await deleteDoc(doc(db, COLLECTION_NAME, id));
+    
+    // Update last modified timestamp to invalidate cache
+    await updateLastModifiedTimestamp('pokemon_last_modified');
+    
     return true;
   } catch (error) {
     console.error('Error deleting Pokemon with image:', error);
@@ -401,6 +430,9 @@ export const saveRating = async (pokemonId: string, deviceId: string, rating: nu
       };
       
       await addDoc(collection(db, RATINGS_COLLECTION), newRatingData);
+      
+      // Update last modified timestamp to invalidate ratings cache
+      await updateLastModifiedTimestamp('ratings_last_modified');
     } else {
       // Update existing rating document
       const ratingDoc = ratingsSnapshot.docs[0];
@@ -422,6 +454,9 @@ export const saveRating = async (pokemonId: string, deviceId: string, rating: nu
       });
     }
     
+    // Update last modified timestamp to invalidate ratings cache
+    await updateLastModifiedTimestamp('ratings_last_modified');
+    
     return true;
   } catch (error) {
     console.error('Error saving rating:', error);
@@ -430,7 +465,8 @@ export const saveRating = async (pokemonId: string, deviceId: string, rating: nu
 };
 
 // Get all ratings
-export const getAllRatings = async (): Promise<{ [pokemonId: string]: PokemonRating }> => {
+// Internal function to fetch ratings from Firebase (used by cache)
+const fetchRatingsFromFirebase = async (): Promise<{ [pokemonId: string]: PokemonRating }> => {
   try {
     const ratingsSnapshot = await getDocs(collection(db, RATINGS_COLLECTION));
     const ratings: { [pokemonId: string]: PokemonRating } = {};
@@ -448,6 +484,11 @@ export const getAllRatings = async (): Promise<{ [pokemonId: string]: PokemonRat
     console.error('Error fetching ratings:', error);
     return {};
   }
+};
+
+// Public function with caching
+export const getAllRatings = async (): Promise<{ [pokemonId: string]: PokemonRating }> => {
+  return getCachedRatingsData(fetchRatingsFromFirebase);
 };
 
 // Get ratings for a specific Pokemon
