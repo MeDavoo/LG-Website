@@ -1861,29 +1861,29 @@ const Home = () => {
                         {userRatingStats.totalUnrated}
                       </button>
                     </div>
+                    
+                    {/* Delete User Data Button - Hidden inside collapse */}
+                    {(userRatingStats.totalRatings > 0 || userFavorites.length > 0) && (
+                      <div className="mt-3 pt-3 border-t border-white/10">
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure? This will permanently delete all your ratings and favorites. This action cannot be undone.')) {
+                              deleteUserData();
+                            }
+                          }}
+                          className="w-full px-2 py-1 bg-red-500/60 hover:bg-red-500/80 text-white/80 text-xs rounded transition-colors"
+                          title="Permanently delete all your ratings and favorites"
+                        >
+                          🗑️ Delete My Data
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
                 
                 {userRatingStats.totalRatings === 0 && (
                   <div className="text-center text-white/50 text-xs mt-2">
                     No ratings yet. Start rating each Pokemon!
-                  </div>
-                )}
-                
-                {/* Delete User Data Button - Only show if user has data */}
-                {(userRatingStats.totalRatings > 0 || userFavorites.length > 0) && (
-                  <div className="mt-3 pt-3 border-t border-white/10">
-                    <button
-                      onClick={() => {
-                        if (window.confirm('Are you sure? This will permanently delete all your ratings and favorites. This action cannot be undone.')) {
-                          deleteUserData();
-                        }
-                      }}
-                      className="w-full px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white text-xs rounded transition-colors"
-                      title="Permanently delete all your ratings and favorites"
-                    >
-                      Delete My Data
-                    </button>
                   </div>
                 )}
               </div>
