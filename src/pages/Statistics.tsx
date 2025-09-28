@@ -15,7 +15,6 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Users, Image, Palette, TrendingUp, TrendingDown, Trophy } from 'lucide-react';
 import { getAllPokemon, Pokemon, getArtistRankings, getAllRatings, PokemonRating, getGlobalRankings } from '../services/pokemonService';
 import Footer from '../components/Footer';
-import { clearAllCache, getCacheStats } from '../services/cacheService';
 
 ChartJS.register(
   CategoryScale,
@@ -575,44 +574,6 @@ const Statistics = () => {
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-white mb-4">Statistics</h1>
         <p className="text-white/80">Complete overview of our Pokemon artwork collection</p>
-        
-        {/* Cache Management */}
-        <div className="mt-4 p-3 bg-purple-500/20 border border-purple-400/30 rounded-lg max-w-md mx-auto">
-          <p className="text-purple-200 text-sm mb-2">🗄️ <strong>Cache Management:</strong></p>
-          <div className="flex justify-center gap-2">
-            <button
-              onClick={() => {
-                const stats = getCacheStats();
-                console.log('Cache Stats:', stats);
-                alert(`Cache Status:\n✨ Pokemon: ${stats.pokemonCached ? '✅ Cached' : '❌ Not cached'}\n⭐ Ratings: ${stats.ratingsCached ? '✅ Cached' : '❌ Not cached'}\n📊 Size: ${Math.round(stats.cacheSize/1024)}KB`);
-              }}
-              className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded"
-              title="Check cache status"
-            >
-              📊 Stats
-            </button>
-            <button
-              onClick={() => {
-                clearAllCache();
-                alert('Cache cleared! Reload the page to fetch fresh data.');
-              }}
-              className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
-              title="Clear all cached data"
-            >
-              🗑️ Clear
-            </button>
-            <button
-              onClick={async () => {
-                clearAllCache();
-                window.location.reload();
-              }}
-              className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded"
-              title="Clear cache and reload"
-            >
-              🔄 Refresh
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Overview Cards */}
