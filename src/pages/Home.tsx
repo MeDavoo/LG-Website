@@ -4,7 +4,7 @@ import { deleteField } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
-import { clearAllCache, getCacheStats } from '../services/cacheService';
+import { clearAllCache, getCacheStats, clearRatingsCache } from '../services/cacheService';
 
 interface PokemonSlot {
   id: number;
@@ -882,6 +882,9 @@ const Home = () => {
       if (!success) {
         throw new Error('Failed to save rating to Firebase');
       }
+      
+      // Clear ratings cache immediately for instant UI updates
+      clearRatingsCache();
       
       // Reload rankings after successful save
       await loadRatings();

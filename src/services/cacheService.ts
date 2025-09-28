@@ -174,6 +174,13 @@ export function clearAllCache(): void {
   console.log('All cache cleared');
 }
 
+// Clear only ratings cache to fix rating staleness
+export function clearRatingsCache(): void {
+  localStorage.removeItem(CACHE_KEYS.RATINGS_DATA);
+  localStorage.removeItem(CACHE_KEYS.LAST_CHECK);
+  console.log('Ratings cache cleared');
+}
+
 // Get cache stats for debugging
 export function getCacheStats() {
   return {
