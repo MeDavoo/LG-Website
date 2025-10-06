@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
-import { getCachedPokemonData, getCachedRatingsData, updateLastModifiedTimestamp } from './cacheService';
+import { getCachedPokemonData, getCachedRatingsData, updateLastModifiedTimestamp, clearCacheAfterChange } from './cacheService';
 
 export interface Pokemon {
   id: string; // Firebase document ID
@@ -233,6 +233,9 @@ export const addPokemon = async (pokemon: Omit<Pokemon, 'id' | 'createdAt' | 'up
     // Update last modified timestamp to invalidate cache
     await updateLastModifiedTimestamp('pokemon_last_modified');
     
+    // Clear cache immediately for instant UI updates
+    clearCacheAfterChange();
+    
     return docRef.id;
   } catch (error) {
     console.error('Error adding Pokemon:', error);
@@ -251,6 +254,9 @@ export const updatePokemon = async (id: string, updates: Partial<Pokemon>): Prom
     
     // Update last modified timestamp to invalidate cache
     await updateLastModifiedTimestamp('pokemon_last_modified');
+    
+    // Clear cache immediately for instant UI updates
+    clearCacheAfterChange();
     
     return true;
   } catch (error) {
@@ -287,6 +293,13 @@ export const deletePokemonImage = async (imageUrl: string): Promise<boolean> => 
 export const deletePokemon = async (id: string): Promise<boolean> => {
   try {
     await deleteDoc(doc(db, COLLECTION_NAME, id));
+    
+    // Update last modified timestamp to invalidate cache
+    await updateLastModifiedTimestamp('pokemon_last_modified');
+    
+    // Clear cache immediately for instant UI updates
+    clearCacheAfterChange();
+    
     return true;
   } catch (error) {
     console.error('Error deleting Pokemon:', error);
@@ -307,6 +320,9 @@ export const deletePokemonWithImage = async (id: string, imageUrl: string): Prom
     
     // Update last modified timestamp to invalidate cache
     await updateLastModifiedTimestamp('pokemon_last_modified');
+    
+    // Clear cache immediately for instant UI updates
+    clearCacheAfterChange();
     
     return true;
   } catch (error) {
@@ -456,6 +472,9 @@ export const saveRating = async (pokemonId: string, deviceId: string, rating: nu
     
     // Update last modified timestamp to invalidate ratings cache
     await updateLastModifiedTimestamp('ratings_last_modified');
+    
+    // Clear cache immediately for instant UI updates
+    clearCacheAfterChange();
     
     return true;
   } catch (error) {
@@ -641,6 +660,12 @@ export const saveFavorite = async (pokemonId: string, deviceId: string, isFavori
         console.log(`ℹ️  No favorite document found for Pokemon: ${pokemonId}`);
       }
     }
+
+    // Update last modified timestamp to invalidate ratings cache (favorites affect display)
+    await updateLastModifiedTimestamp('ratings_last_modified');
+
+    // Clear cache immediately for instant UI updates
+    clearCacheAfterChange();
 
     return true;
   } catch (error) {

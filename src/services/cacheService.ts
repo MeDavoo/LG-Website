@@ -181,6 +181,21 @@ export function clearRatingsCache(): void {
   console.log('Ratings cache cleared');
 }
 
+// Clear only Pokemon cache to fix Pokemon data staleness
+export function clearPokemonCache(): void {
+  localStorage.removeItem(CACHE_KEYS.POKEMON_DATA);
+  localStorage.removeItem(CACHE_KEYS.LAST_CHECK);
+  console.log('Pokemon cache cleared');
+}
+
+// Clear cache immediately after data changes for instant UI updates
+export function clearCacheAfterChange(): void {
+  localStorage.removeItem(CACHE_KEYS.POKEMON_DATA);
+  localStorage.removeItem(CACHE_KEYS.RATINGS_DATA);
+  localStorage.removeItem(CACHE_KEYS.LAST_CHECK);
+  console.log('Cache cleared after data change - next load will be fresh');
+}
+
 // Get cache stats for debugging
 export function getCacheStats() {
   return {
