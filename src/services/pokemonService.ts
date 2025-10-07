@@ -890,4 +890,240 @@ export const forceDeleteFavorite = async (pokemonId: string, deviceId: string): 
   }
 };
 
+// Delete all ratings for a specific device ID
+export const deleteAllUserRatings = async (deviceId: string): Promise<boolean> => {
+  try {
+    console.log(`🗑️ Deleting all ratings for device: ${deviceId}`);
+    
+    // Get all rating documents
+    const ratingsSnapshot = await getDocs(collection(db, RATINGS_COLLECTION));
+    const updatePromises: Promise<void>[] = [];
+    
+    ratingsSnapshot.docs.forEach(doc => {
+      const data = doc.data() as PokemonRating;
+      if (data.ratings && data.ratings[deviceId]) {
+        // Remove this device's rating from the ratings object
+        const updatedRatings = { ...data.ratings };
+        delete updatedRatings[deviceId];
+        
+        // Recalculate average, total votes, and total points
+        const ratingsArray = Object.values(updatedRatings);
+        const totalVotes = ratingsArray.length;
+        const averageRating = totalVotes > 0 ? ratingsArray.reduce((sum, r) => sum + r, 0) / totalVotes : 0;
+        const totalPoints = ratingsArray.reduce((sum, r) => sum + starsToPoints(r), 0);
+        
+        if (totalVotes === 0) {
+          // If no ratings left, delete the entire document
+          updatePromises.push(deleteDoc(doc.ref));
+        } else {
+          // Update the document with new calculations
+          updatePromises.push(updateDoc(doc.ref, {
+            ratings: updatedRatings,
+            averageRating,
+            totalVotes,
+            totalPoints,
+            lastUpdated: new Date()
+          }));
+        }
+      }
+    });
+    
+    await Promise.all(updatePromises);
+    
+    // Update last modified timestamp to invalidate cache
+    await updateLastModifiedTimestamp('ratings_last_modified');
+    
+    // Clear cache immediately for instant UI updates
+    clearCacheAfterChange();
+    
+    console.log(`✅ Deleted all ratings for device: ${deviceId}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error deleting ratings for device ${deviceId}:`, error);
+    return false;
+  }
+};
+
+// Delete all favorites for a specific device ID
+export const deleteAllUserFavorites = async (deviceId: string): Promise<boolean> => {
+  try {
+    console.log(`🗑️ Deleting all favorites for device: ${deviceId}`);
+    
+    const favoritesRef = collection(db, 'favorites');
+    const q = query(favoritesRef, where('deviceId', '==', deviceId));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+      console.log(`✅ Deleted ${querySnapshot.docs.length} favorite(s) for device: ${deviceId}`);
+    } else {
+      console.log(`ℹ️ No favorites found for device: ${deviceId}`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`❌ Error deleting favorites for device ${deviceId}:`, error);
+    return false;
+  }
+};
+
+// Delete all user data (ratings and favorites) for a specific device ID
+export const deleteAllUserData = async (deviceId: string): Promise<boolean> => {
+  try {
+    console.log(`🗑️ Starting complete data deletion for device: ${deviceId}`);
+    
+    // Delete ratings first
+    const ratingsDeleted = await deleteAllUserRatings(deviceId);
+    
+    // Delete favorites
+    const favoritesDeleted = await deleteAllUserFavorites(deviceId);
+    
+    if (ratingsDeleted && favoritesDeleted) {
+      console.log(`✅ Successfully deleted all data for device: ${deviceId}`);
+      return true;
+    } else {
+      console.log(`⚠️ Partial deletion completed for device: ${deviceId}`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`❌ Error deleting all user data for device ${deviceId}:`, error);
+    return false;
+  }
+};
+
+// SAFE CLEANUP FUNCTION - Analyze devices with very few votes
+export const analyzeLowVoteDevices = async (maxVotes: number = 2): Promise<{
+  devices: Array<{
+    deviceId: string;
+    totalVotes: number;
+    pokemonVoted: Array<{ pokemonId: string; rating: number }>;
+  }>;
+  totalDevicesToCleanup: number;
+  totalVotesToDelete: number;
+}> => {
+  try {
+    console.log(`🔍 Analyzing devices with ${maxVotes} or fewer total votes...`);
+    
+    // Get all rating documents
+    const ratingsSnapshot = await getDocs(collection(db, RATINGS_COLLECTION));
+    
+    // Track vote count per device across all Pokemon
+    const deviceVoteCounts: { [deviceId: string]: Array<{ pokemonId: string; rating: number }> } = {};
+    
+    ratingsSnapshot.docs.forEach(doc => {
+      const data = doc.data() as PokemonRating;
+      const pokemonId = data.pokemonId;
+      
+      if (data.ratings) {
+        Object.entries(data.ratings).forEach(([deviceId, rating]) => {
+          if (typeof rating === 'number' && deviceId !== 'averageRating' && deviceId !== 'totalVotes' && deviceId !== 'totalPoints') {
+            if (!deviceVoteCounts[deviceId]) {
+              deviceVoteCounts[deviceId] = [];
+            }
+            deviceVoteCounts[deviceId].push({ pokemonId, rating });
+          }
+        });
+      }
+    });
+    
+    // Find devices with very few votes
+    const lowVoteDevices = Object.entries(deviceVoteCounts)
+      .filter(([_, votes]) => votes.length <= maxVotes)
+      .map(([deviceId, votes]) => ({
+        deviceId,
+        totalVotes: votes.length,
+        pokemonVoted: votes
+      }))
+      .sort((a, b) => a.totalVotes - b.totalVotes);
+    
+    const totalVotesToDelete = lowVoteDevices.reduce((sum, device) => sum + device.totalVotes, 0);
+    
+    console.log(`📊 Analysis Results:`);
+    console.log(`- Found ${lowVoteDevices.length} devices with ${maxVotes} or fewer votes`);
+    console.log(`- Total votes to be deleted: ${totalVotesToDelete}`);
+    console.log(`- Devices breakdown:`, lowVoteDevices);
+    
+    return {
+      devices: lowVoteDevices,
+      totalDevicesToCleanup: lowVoteDevices.length,
+      totalVotesToDelete
+    };
+  } catch (error) {
+    console.error('❌ Error analyzing low vote devices:', error);
+    throw error;
+  }
+};
+
+// SAFE CLEANUP FUNCTION - Delete devices with very few votes (WITH CONFIRMATION)
+export const cleanupLowVoteDevices = async (maxVotes: number = 2, confirmationText: string): Promise<{
+  success: boolean;
+  devicesDeleted: number;
+  votesDeleted: number;
+  errors: string[];
+}> => {
+  // SAFETY CHECK - Require exact confirmation text
+  if (confirmationText !== `DELETE_DEVICES_WITH_${maxVotes}_OR_FEWER_VOTES`) {
+    throw new Error(`❌ Safety check failed. Required confirmation text: DELETE_DEVICES_WITH_${maxVotes}_OR_FEWER_VOTES`);
+  }
+  
+  try {
+    console.log(`🚨 STARTING CLEANUP OF DEVICES WITH ${maxVotes} OR FEWER VOTES`);
+    
+    // First, analyze what we're about to delete
+    const analysis = await analyzeLowVoteDevices(maxVotes);
+    
+    if (analysis.totalDevicesToCleanup === 0) {
+      console.log('✅ No devices found with qualifying vote counts. Nothing to clean up.');
+      return {
+        success: true,
+        devicesDeleted: 0,
+        votesDeleted: 0,
+        errors: []
+      };
+    }
+    
+    console.log(`⚠️ ABOUT TO DELETE ${analysis.totalDevicesToCleanup} devices with ${analysis.totalVotesToDelete} total votes`);
+    
+    const errors: string[] = [];
+    let devicesDeleted = 0;
+    let votesDeleted = 0;
+    
+    // Delete each device's data
+    for (const device of analysis.devices) {
+      try {
+        console.log(`🗑️ Deleting device ${device.deviceId} (${device.totalVotes} votes)`);
+        
+        const success = await deleteAllUserData(device.deviceId);
+        if (success) {
+          devicesDeleted++;
+          votesDeleted += device.totalVotes;
+          console.log(`✅ Deleted device ${device.deviceId}`);
+        } else {
+          errors.push(`Failed to delete device ${device.deviceId}`);
+        }
+      } catch (error) {
+        const errorMsg = `Error deleting device ${device.deviceId}: ${error}`;
+        console.error(errorMsg);
+        errors.push(errorMsg);
+      }
+    }
+    
+    console.log(`🏁 CLEANUP COMPLETE:`);
+    console.log(`- Devices deleted: ${devicesDeleted}/${analysis.totalDevicesToCleanup}`);
+    console.log(`- Votes deleted: ${votesDeleted}`);
+    console.log(`- Errors: ${errors.length}`);
+    
+    return {
+      success: errors.length === 0,
+      devicesDeleted,
+      votesDeleted,
+      errors
+    };
+  } catch (error) {
+    console.error('❌ Critical error during cleanup:', error);
+    throw error;
+  }
+};
+
 

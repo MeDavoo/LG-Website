@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber, saveRating, getAllRatings, getGlobalRankings, reorganizePokedex, saveFavorite, getAllFavorites, getUserFavorites, cleanupFavoriteDocuments, forceDeleteFavorite, resetAllFavorites } from '../services/pokemonService';
+import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber, saveRating, getAllRatings, getGlobalRankings, reorganizePokedex, saveFavorite, getAllFavorites, getUserFavorites, cleanupFavoriteDocuments, forceDeleteFavorite, resetAllFavorites, deleteAllUserData, analyzeLowVoteDevices, cleanupLowVoteDevices } from '../services/pokemonService';
 import { deleteField } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -961,10 +961,14 @@ const Home = () => {
       (window as any).cleanupFavorites = cleanupFavoriteDocuments;
       (window as any).forceDeleteFavorite = forceDeleteFavorite;
       (window as any).resetAllFavorites = resetAllFavorites;
+      (window as any).analyzeLowVoteDevices = analyzeLowVoteDevices;
+      (window as any).cleanupLowVoteDevices = cleanupLowVoteDevices;
       console.log('🔧 Debug functions available:');
       console.log('  - window.cleanupFavorites()');
       console.log('  - window.forceDeleteFavorite(pokemonId, deviceId)');
       console.log('  - window.resetAllFavorites()');
+      console.log('  - window.analyzeLowVoteDevices(maxVotes) // Analyze devices with few votes');
+      console.log('  - window.cleanupLowVoteDevices(maxVotes, confirmationText) // CAREFUL!');
     }
   }, []);
 
@@ -1031,29 +1035,40 @@ const Home = () => {
   // Delete all user data (favorites and ratings)
   const deleteUserData = async () => {
     try {
-      // Clear localStorage data
-      localStorage.removeItem('pokemon_device_id');
-      localStorage.removeItem('pokemon_ratings');
-      localStorage.removeItem('pokemon_filter_collapsed_sections');
+      const deviceId = getDeviceId();
       
-      // Reset all state
-      setUserFavorites([]);
-      setPokemonFavorites({});
-      setPokemonRatings({});
-      setUserRatingStats({
-        averageRating: 0,
-        totalRatings: 0,
-        totalUnrated: pokemonSlots.filter(p => p.hasArt && p.firebaseId).length,
-        ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
-      });
+      // Delete data from Firebase first
+      const firebaseDeleted = await deleteAllUserData(deviceId);
       
-      // Note: We don't need to delete from Firebase as the deviceId will be different
-      // when they interact again, effectively orphaning their old data
-      
-      showNotification('All your data has been deleted', 'info');
+      if (firebaseDeleted) {
+        // Clear localStorage data only after successful Firebase deletion
+        localStorage.removeItem('pokemon_device_id');
+        localStorage.removeItem('pokemon_ratings');
+        localStorage.removeItem('pokemon_filter_collapsed_sections');
+        
+        // Reset all state
+        setUserFavorites([]);
+        setPokemonFavorites({});
+        setPokemonRatings({});
+        setUserRatingStats({
+          averageRating: 0,
+          totalRatings: 0,
+          totalUnrated: pokemonSlots.filter(p => p.hasArt && p.firebaseId).length,
+          ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
+        });
+        
+        // Reload data to reflect changes
+        await loadRatings();
+        await loadFavorites();
+        await loadUserRatingStats();
+        
+        showNotification('✅ All your data has been permanently deleted from our servers', 'success');
+      } else {
+        showNotification('❌ Failed to delete some data. Please try again.', 'error');
+      }
     } catch (error) {
       console.error('Error deleting user data:', error);
-      showNotification('Error deleting data', 'error');
+      showNotification('❌ Error deleting data. Please try again.', 'error');
     }
   };
   
