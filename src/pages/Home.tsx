@@ -1090,6 +1090,13 @@ const Home = () => {
   const [ratingSortOrder, setRatingSortOrder] = useState<'none' | 'ascending' | 'descending'>('none'); // Sort by global ranking
   const [showTiers, setShowTiers] = useState(true); // Toggle tier letters display
 
+  // View mode state for list layout
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+    // Load saved view mode from localStorage, default to 'list'
+    const saved = localStorage.getItem('pokemon_view_mode');
+    return (saved === 'list' || saved === 'grid') ? saved : 'list';
+  });
+
   // Mobile filter modal state
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -1149,6 +1156,16 @@ const Home = () => {
       // Save to localStorage
       localStorage.setItem('pokemon_filter_collapsed_sections', JSON.stringify(newState));
       return newState;
+    });
+  };
+
+  // Toggle view mode and save to localStorage
+  const toggleViewMode = () => {
+    setViewMode(prev => {
+      const newViewMode = prev === 'list' ? 'grid' : 'list';
+      // Save to localStorage
+      localStorage.setItem('pokemon_view_mode', newViewMode);
+      return newViewMode;
     });
   };
 
@@ -1952,6 +1969,34 @@ const Home = () => {
                       isPositionEditorMode ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   />
+                  
+                  {/* View Toggle Button */}
+                  <button
+                    onClick={toggleViewMode}
+                    className={`px-3 py-1 rounded-lg font-semibold transition-all text-sm flex items-center gap-1 ${
+                      viewMode === 'grid'
+                        ? 'bg-green-500 text-white hover:bg-green-600'
+                        : 'bg-gray-500 text-white hover:bg-gray-600'
+                    }`}
+                    title={viewMode === 'list' ? 'Switch to Grid View' : 'Switch to List View'}
+                  >
+                    {viewMode === 'list' ? (
+                      <>
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                        </svg>
+                        Grid
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                        </svg>
+                        List
+                      </>
+                    )}
+                  </button>
+                  
                   {isAdmin && (
                     <div className="flex gap-2">
                       <button
@@ -2022,36 +2067,40 @@ const Home = () => {
               
               {/* Pokemon List */}
               <div ref={pokemonListRef} className="bg-white/5 backdrop-blur-md rounded-xl border border-white/20 p-2 overflow-y-auto custom-scrollbar" style={{maxHeight: 'calc(100vh - 170px)'}}>
-                <div className="space-y-2">
-                  {sortedPokemon.map((pokemon, index) => (
-                    <div key={pokemon.id} className={`flex items-center transition-all duration-300 ease-in-out ${showTiers ? 'gap-2' : 'gap-0'}`}>
-                      {/* Pokemon List Item - Shrinks to make room for tier images */}
-                      <div
-                        data-pokemon-id={pokemon.id}
-                        draggable={isPositionEditorMode && pokemon.hasArt}
-                        onDragStart={() => handleDragStart(pokemon)}
-                        onDragOver={handleDragOver}
-                        onDrop={() => handleDrop(pokemon)}
-                        onClick={() => {
-                          if (!isPositionEditorMode) {
-                            setSelectedPokemon(pokemon);
-                            setShowDeleteConfirm(false);
-                            setShowEditForm(false);
-                            setShowActionsDropdown(false);
-                          }
-                        }}
-                        className={`flex items-center p-2 m-1 rounded-lg border transition-all duration-300 ease-in-out animate-fade-in-up ${showTiers ? 'flex-1' : 'w-full'} ${
-                          isPositionEditorMode 
-                            ? pokemon.hasArt 
-                              ? 'cursor-grab active:cursor-grabbing bg-blue-500/10 border-blue-400/50 hover:bg-blue-500/20 hover:border-blue-400' 
-                              : 'cursor-not-allowed bg-gray-500/10 border-gray-400/20'
-                            : `cursor-pointer ${
-                                selectedPokemon?.id === pokemon.id
+                {viewMode === 'list' ? (
+                  /* List View */
+                  <div className="space-y-2">
+                    {sortedPokemon.map((pokemon, index) => (
+                      <div key={pokemon.id} className={`flex items-center transition-all duration-300 ease-in-out ${showTiers ? 'gap-2' : 'gap-0'}`}>
+                        {/* Pokemon List Item - Shrinks to make room for tier images */}
+                        <div
+                          data-pokemon-id={pokemon.id}
+                          draggable={isPositionEditorMode && pokemon.hasArt}
+                          onDragStart={() => handleDragStart(pokemon)}
+                          onDragOver={handleDragOver}
+                          onDrop={() => handleDrop(pokemon)}
+                          onClick={() => {
+                            if (!isPositionEditorMode) {
+                              setSelectedPokemon(pokemon);
+                              setShowDeleteConfirm(false);
+                              setShowEditForm(false);
+                              setShowActionsDropdown(false);
+                            }
+                          }}
+                          className={`flex items-center p-2 m-1 rounded-lg border transition-all duration-300 ease-in-out animate-fade-in-up ${showTiers ? 'flex-1' : 'w-full'} ${
+                            isPositionEditorMode 
+                              ? pokemon.hasArt 
+                                ? 'cursor-grab active:cursor-grabbing bg-blue-500/10 border-blue-400/50 hover:bg-blue-500/20 hover:border-blue-400' 
+                                : 'cursor-not-allowed bg-gray-500/10 border-gray-400/20'
+                              : `cursor-pointer ${
+                                  selectedPokemon?.id === pokemon.id
                                   ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
                                   : pokemon.hasArt 
-                                  ? (pokemon.evolutionStage === 4 
-                                    ? 'bg-orange-200/10 border-orange-300/20 hover:bg-orange-200/20 hover:border-orange-300/30' 
-                                    : 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40')
+                                  ? pokemon.firebaseId && isPokemonFavorited(pokemon.firebaseId)
+                                    ? 'bg-red-300/10 border-red-400/30 hover:bg-red-500/20 hover:border-red-400/50'
+                                    : (pokemon.evolutionStage === 4 
+                                      ? 'bg-orange-200/10 border-orange-300/20 hover:bg-orange-200/20 hover:border-orange-300/30' 
+                                      : 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40')
                                   : 'bg-white/5 border-white/10 hover:bg-white/10'
                               }`
                         } ${isDragging && draggedPokemon?.id === pokemon.id ? 'opacity-50 scale-95' : ''}`}
@@ -2214,6 +2263,148 @@ const Home = () => {
                     </div>
                   )}
                 </div>
+                ) : (
+                  /* Grid View */
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                    {sortedPokemon.map((pokemon, index) => (
+                      <div
+                        key={pokemon.id}
+                        data-pokemon-id={pokemon.id}
+                        draggable={isPositionEditorMode && pokemon.hasArt}
+                        onDragStart={() => handleDragStart(pokemon)}
+                        onDragOver={handleDragOver}
+                        onDrop={() => handleDrop(pokemon)}
+                        onClick={() => {
+                          if (!isPositionEditorMode) {
+                            setSelectedPokemon(pokemon);
+                            setShowDeleteConfirm(false);
+                            setShowEditForm(false);
+                            setShowActionsDropdown(false);
+                          }
+                        }}
+                        className={`relative bg-white/10 rounded-lg border transition-all duration-300 ease-in-out animate-fade-in-up overflow-hidden ${
+                          isPositionEditorMode 
+                            ? pokemon.hasArt 
+                              ? 'cursor-grab active:cursor-grabbing bg-blue-500/10 border-blue-400/50 hover:bg-blue-500/20 hover:border-blue-400' 
+                              : 'cursor-not-allowed bg-gray-500/10 border-gray-400/20'
+                            : `cursor-pointer ${
+                                selectedPokemon?.id === pokemon.id
+                                  ? 'bg-yellow-500/20 border-yellow-400'
+                                  : pokemon.hasArt
+                                  ? pokemon.firebaseId && isPokemonFavorited(pokemon.firebaseId)
+                                    ? 'bg-red-500/10 border-red-400/30 hover:bg-red-500/20 hover:border-red-400/50'
+                                    : 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40'
+                                  : 'bg-gray-500/10 border-gray-400/20'
+                              }`
+                        } ${
+                          isDragging && draggedPokemon?.id === pokemon.id ? 'dragging' : ''
+                        }`}
+                        style={{
+                          animationDelay: isInitialLoad ? `${index * animationSpeedMultiplier * 50}ms` : '0ms'
+                        }}
+                      >
+                        {/* Tier Badge - Top Right */}
+                        {showTiers && pokemon.hasArt && pokemon.firebaseId && (
+                          <div className="absolute top-1 right-1 z-10">
+                            <div 
+                              className="w-6 h-6 rounded flex items-center justify-center"
+                              style={{
+                                backgroundImage: `url(${getTierImagePath(getPokemonTier(pokemon.firebaseId))})`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center'
+                              }}
+                              title={`Tier ${getPokemonTier(pokemon.firebaseId)} (${pokemonRatings[pokemon.firebaseId]?.averageRating?.toFixed(1) || 'N/A'}/10)`}
+                            />
+                          </div>
+                        )}
+                        
+                        {/* Pokemon Image */}
+                        <div className="aspect-square bg-white/5 relative">
+                          {pokemon.hasArt && pokemon.imageUrl ? (
+                            <img
+                              src={pokemon.imageUrl}
+                              alt={pokemon.name}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-white/30">
+                              <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          )}
+                          
+                          {/* Favorite Heart - Top Left */}
+                          {pokemon.hasArt && pokemon.firebaseId && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleFavoriteToggle(pokemon.firebaseId!);
+                              }}
+                              className={`absolute top-1 left-1 p-1 rounded-full transition-all duration-200 ${
+                                isPokemonFavorited(pokemon.firebaseId)
+                                  ? 'text-red-500 bg-white/90 hover:bg-white scale-110'
+                                  : 'text-white/70 bg-black/50 hover:bg-black/70 hover:text-white'
+                              }`}
+                              title={isPokemonFavorited(pokemon.firebaseId) ? 'Remove from favorites' : 'Add to favorites'}
+                            >
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                        
+                        {/* Pokemon Info */}
+                        <div className="p-2">
+                          <div className="text-xs text-white/70 mb-1">#{pokemon.id.toString().padStart(3, '0')}</div>
+                          <div className="text-sm font-semibold text-white truncate" title={pokemon.name}>
+                            {pokemon.name}
+                          </div>
+                          {pokemon.artist && (
+                            <div className="text-xs text-white/60 truncate" title={`By ${pokemon.artist}`}>
+                              {pokemon.artist}
+                            </div>
+                          )}
+                          
+                          {/* Types and Rating - Compact format */}
+                          {pokemon.hasArt && (
+                            <div className="flex items-center justify-between mt-1">
+                              {/* Types */}
+                              <div className="flex gap-1">
+                                {pokemon.types?.map(type => (
+                                  <span 
+                                    key={type} 
+                                    className={`text-xs px-2 py-0.5 rounded-full text-white font-medium ${getTypeColor(type)}`}
+                                  >
+                                    {type}
+                                  </span>
+                                ))}
+                              </div>
+                              
+                              {/* Rating */}
+                              {pokemon.firebaseId && (
+                                <div className="flex items-center gap-1 text-xs text-yellow-300">
+                                  <span>★</span>
+                                  <span className="text-white/70">
+                                    {pokemonRatings[pokemon.firebaseId]?.averageRating?.toFixed(1) || 'N/A'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {sortedPokemon.length === 0 && (
+                      <div className="col-span-full text-center py-8">
+                        <p className="text-white/60">No Pokemon match your current filters</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               
               {/* Scroll to Bottom Button */}
