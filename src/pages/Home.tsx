@@ -2362,36 +2362,50 @@ const Home = () => {
                           <div className="text-sm font-semibold text-white truncate" title={pokemon.name}>
                             {pokemon.name}
                           </div>
-                          {pokemon.artist && (
-                            <div className="text-xs text-white/60 truncate" title={`By ${pokemon.artist}`}>
-                              {pokemon.artist}
-                            </div>
-                          )}
-                          
                           {/* Types and Rating - Compact format */}
                           {pokemon.hasArt && (
-                            <div className="flex items-center justify-between mt-1">
-                              {/* Types */}
-                              <div className="flex gap-1">
-                                {pokemon.types?.map(type => (
-                                  <span 
-                                    key={type} 
-                                    className={`text-xs px-2 py-0.5 rounded-full text-white font-medium ${getTypeColor(type)}`}
-                                  >
-                                    {type}
-                                  </span>
-                                ))}
-                              </div>
-                              
-                              {/* Rating */}
-                              {pokemon.firebaseId && (
-                                <div className="flex items-center gap-1 text-xs text-yellow-300">
-                                  <span>★</span>
-                                  <span className="text-white/70">
-                                    {pokemonRatings[pokemon.firebaseId]?.averageRating?.toFixed(1) || 'N/A'}
-                                  </span>
+                            <div className="space-y-1 mt-1">
+                              {/* Artist and Favorite Counter */}
+                              {pokemon.artist && (
+                                <div className="flex items-center justify-between">
+                                  <div className="text-xs text-white/60 truncate" title={`By ${pokemon.artist}`}>
+                                    {pokemon.artist}
+                                  </div>
+                                  {pokemon.firebaseId && getPokemonFavoriteCount(pokemon.firebaseId) > 0 && (
+                                    <div className="flex items-center gap-1 text-xs text-red-300 bg-black/40 rounded-full px-2 py-1">
+                                      <span>❤</span>
+                                      <span className="text-white/70">
+                                        {getPokemonFavoriteCount(pokemon.firebaseId)}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               )}
+                              
+                              {/* Types and Rating */}
+                              <div className="flex items-center justify-between">
+                                {/* Types */}
+                                <div className="flex gap-1">
+                                  {pokemon.types?.map(type => (
+                                    <span 
+                                      key={type} 
+                                      className={`text-xs px-2 py-0.5 rounded-full text-white font-medium ${getTypeColor(type)}`}
+                                    >
+                                      {type}
+                                    </span>
+                                  ))}
+                                </div>
+                                
+                                {/* Rating */}
+                                {pokemon.firebaseId && (
+                                  <div className="flex items-center gap-1 text-xs text-yellow-300 bg-black/40 rounded-full px-2 py-1">
+                                    <span>★</span>
+                                    <span className="text-white/70">
+                                      {pokemonRatings[pokemon.firebaseId]?.averageRating?.toFixed(1) || 'N/A'}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
