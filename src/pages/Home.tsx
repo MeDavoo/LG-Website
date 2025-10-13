@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber, saveRating, getAllRatings, getGlobalRankings, reorganizePokedex, saveFavorite, getAllFavorites, getUserFavorites, cleanupFavoriteDocuments, forceDeleteFavorite, resetAllFavorites, deleteAllUserData, analyzeLowVoteDevices, cleanupLowVoteDevices } from '../services/pokemonService';
+import { getAllPokemon, Pokemon, deletePokemonWithImage, updatePokemon, addPokemon, uploadPokemonImage, getNextPokedexNumber, saveRating, getAllRatings, getGlobalRankings, reorganizePokedex, saveFavorite, getAllFavorites, getUserFavorites, cleanupFavoriteDocuments, forceDeleteFavorite, resetAllFavorites, deleteAllUserData, analyzeLowVoteDevices, cleanupLowVoteDevices, updatePokemonStats, getPokemonStats } from '../services/pokemonService';
 import { deleteField } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { clearAllCache, getCacheStats, clearRatingsCache } from '../services/cacheService';
+import StatsEditor from '../components/StatsEditor';
+import { PokemonStats, PokemonAbility } from '../types/pokemon';
 
 interface PokemonSlot {
   id: number;
@@ -619,6 +621,10 @@ const Home = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
 
+  // Stats Editor state
+  const [isStatsEditorMode, setIsStatsEditorMode] = useState(false);
+  const [pokemonStats, setPokemonStats] = useState<{stats?: PokemonStats, ability?: PokemonAbility} | null>(null);
+
   // Auto-select first Pokemon with artwork when data loads
   useEffect(() => {
     if (pokemonSlots.length > 0 && !selectedPokemon) {
@@ -734,6 +740,39 @@ const Home = () => {
       setNotification(prev => ({ ...prev, show: false }));
     }, 5000); // Hide after 5 seconds (increased from 4)
   };
+
+  // Stats Editor functions
+  const toggleStatsEditor = async () => {
+    if (!selectedPokemon?.firebaseId) return;
+    
+    if (!isStatsEditorMode) {
+      // Entering stats editor mode - load current stats
+      const currentStats = await getPokemonStats(selectedPokemon.firebaseId);
+      setPokemonStats(currentStats);
+    }
+    
+    setIsStatsEditorMode(!isStatsEditorMode);
+  };
+
+  const handleSaveStats = async (stats: PokemonStats, ability: PokemonAbility) => {
+    if (!selectedPokemon?.firebaseId) return;
+    
+    const success = await updatePokemonStats(selectedPokemon.firebaseId, stats, ability);
+    if (success) {
+      showNotification('✅ Stats and ability saved successfully!', 'success');
+      // Update local state
+      setPokemonStats({ stats, ability });
+    } else {
+      showNotification('❌ Failed to save stats. Please try again.', 'error');
+    }
+  };
+
+  // Load stats when selected Pokemon changes
+  useEffect(() => {
+    if (selectedPokemon?.firebaseId && isStatsEditorMode) {
+      getPokemonStats(selectedPokemon.firebaseId).then(setPokemonStats);
+    }
+  }, [selectedPokemon?.firebaseId, isStatsEditorMode]);
 
   // 3D Image Animation functions
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1919,6 +1958,7 @@ const Home = () => {
                   </div>
                 )}
               </div>
+
               </div>
             </div>
             
@@ -2661,6 +2701,18 @@ const Home = () => {
                       )}
                     </div>
                     
+                    {/* Stats Editor Section (Admin Only) */}
+                    {isAdmin && isStatsEditorMode && selectedPokemon?.firebaseId && (
+                      <div className="mt-4 mb-4">
+                        <StatsEditor
+                          pokemonId={selectedPokemon.firebaseId}
+                          initialStats={pokemonStats?.stats}
+                          initialAbility={pokemonStats?.ability}
+                          onSave={handleSaveStats}
+                        />
+                      </div>
+                    )}
+                    
                     {/* Star Rating System */}
                     <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/10">
                       <div className="flex justify-center items-center flex-wrap gap-1 mb-2">
@@ -3027,10 +3079,10 @@ const Home = () => {
                         }`}>
                           <div className="pt-3">
                             <div className="flex gap-1">
-                              {/* Edit Button (80% width) */}
+                              {/* Edit Button (60% width) */}
                               <button
                                 onClick={() => requireAdmin(handleEditPokemon)}
-                                className="flex-[4] px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold transform hover:scale-[1.02]"
+                                className="flex-[3] px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold transform hover:scale-[1.02]"
                               >
                                 ✏️ Edit Pokemon
                               </button>
@@ -3044,6 +3096,22 @@ const Home = () => {
                                 🗑️
                               </button>
                             </div>
+                            
+                            {/* Stats Editor Toggle Button (Admin Only) */}
+                            {isAdmin && (
+                              <div className="mt-2">
+                                <button
+                                  onClick={() => requireAdmin(toggleStatsEditor)}
+                                  className={`w-full px-4 py-2 text-white rounded-lg transition-colors font-semibold transform hover:scale-[1.02] ${
+                                    isStatsEditorMode 
+                                      ? 'bg-orange-500 hover:bg-orange-600' 
+                                      : 'bg-purple-500 hover:bg-purple-600'
+                                  }`}
+                                >
+                                  {isStatsEditorMode ? '❌ Exit Stats Editor' : 'Edit Stats & Abilities'}
+                                </button>
+                              </div>
+                            )}
                             
                             {/* Delete Confirmation Dialog */}
                             {showDeleteConfirm && (

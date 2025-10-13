@@ -1126,4 +1126,66 @@ export const cleanupLowVoteDevices = async (maxVotes: number = 2, confirmationTe
   }
 };
 
+// Stats and Abilities Functions
+export const updatePokemonStats = async (pokemonId: string, stats: any, ability: any): Promise<boolean> => {
+  try {
+    console.log(`📊 Updating stats for Pokemon ${pokemonId}...`);
+    
+    const pokemonRef = doc(db, COLLECTION_NAME, pokemonId);
+    
+    const updates = {
+      stats: {
+        hp: stats.hp,
+        attack: stats.attack,
+        defense: stats.defense,
+        spAttack: stats.spAttack,
+        spDefense: stats.spDefense,
+        speed: stats.speed,
+        total: stats.total
+      },
+      ability: {
+        id: ability.id,
+        name: ability.name,
+        description: ability.description
+      },
+      updatedAt: new Date()
+    };
+    
+    await updateDoc(pokemonRef, updates);
+    
+    console.log('✅ Pokemon stats updated successfully');
+    
+    // Clear cache after modification
+    await clearCacheAfterChange();
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Error updating Pokemon stats:', error);
+    return false;
+  }
+};
+
+export const getPokemonStats = async (pokemonId: string): Promise<{stats?: any, ability?: any} | null> => {
+  try {
+    console.log(`📊 Loading stats for Pokemon ${pokemonId}...`);
+    
+    const pokemonRef = doc(db, COLLECTION_NAME, pokemonId);
+    const pokemonDoc = await getDoc(pokemonRef);
+    
+    if (!pokemonDoc.exists()) {
+      console.log('❌ Pokemon not found');
+      return null;
+    }
+    
+    const data = pokemonDoc.data();
+    return {
+      stats: data.stats || null,
+      ability: data.ability || null
+    };
+  } catch (error) {
+    console.error('❌ Error loading Pokemon stats:', error);
+    return null;
+  }
+};
+
 

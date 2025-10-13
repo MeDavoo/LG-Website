@@ -22,6 +22,8 @@ const PokemonDetail = () => {
         hp: 85,
         attack: 120,
         defense: 95,
+        spAttack: 110,
+        spDefense: 80,
         speed: 100
       },
       createdAt: new Date(),
@@ -147,20 +149,92 @@ const PokemonDetail = () => {
               <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
                 <h3 className="text-xl font-bold text-white mb-4">Stats</h3>
                 <div className="space-y-4">
-                  {Object.entries(pokemon.stats).map(([stat, value]) => (
-                    <div key={stat}>
-                      <div className="flex justify-between text-white mb-1">
-                        <span className="capitalize">{stat}</span>
-                        <span>{value}</span>
-                      </div>
-                      <div className="w-full bg-white/20 rounded-full h-2">
-                        <div
-                          className="bg-yellow-400 h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${(value / 150) * 100}%` }}
-                        ></div>
+                  <div>
+                    <div className="flex justify-between text-white mb-1">
+                      <span>HP</span>
+                      <span>{pokemon.stats.hp}</span>
+                    </div>
+                    <div className="w-full bg-white/20 rounded-full h-2">
+                      <div
+                        className="bg-green-400 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${(pokemon.stats.hp / 255) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between text-white mb-1">
+                      <span>Attack</span>
+                      <span>{pokemon.stats.attack}</span>
+                    </div>
+                    <div className="w-full bg-white/20 rounded-full h-2">
+                      <div
+                        className="bg-red-400 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${(pokemon.stats.attack / 255) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between text-white mb-1">
+                      <span>Defense</span>
+                      <span>{pokemon.stats.defense}</span>
+                    </div>
+                    <div className="w-full bg-white/20 rounded-full h-2">
+                      <div
+                        className="bg-blue-400 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${(pokemon.stats.defense / 255) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between text-white mb-1">
+                      <span>Sp. Attack</span>
+                      <span>{pokemon.stats.spAttack}</span>
+                    </div>
+                    <div className="w-full bg-white/20 rounded-full h-2">
+                      <div
+                        className="bg-purple-400 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${(pokemon.stats.spAttack / 255) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between text-white mb-1">
+                      <span>Sp. Defense</span>
+                      <span>{pokemon.stats.spDefense}</span>
+                    </div>
+                    <div className="w-full bg-white/20 rounded-full h-2">
+                      <div
+                        className="bg-cyan-400 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${(pokemon.stats.spDefense / 255) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between text-white mb-1">
+                      <span>Speed</span>
+                      <span>{pokemon.stats.speed}</span>
+                    </div>
+                    <div className="w-full bg-white/20 rounded-full h-2">
+                      <div
+                        className="bg-yellow-400 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${(pokemon.stats.speed / 255) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  {pokemon.stats.total && (
+                    <div className="pt-2 border-t border-white/10">
+                      <div className="flex justify-between text-white">
+                        <span className="font-semibold">Total</span>
+                        <span className="font-bold text-yellow-400">{pokemon.stats.total}</span>
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             )}

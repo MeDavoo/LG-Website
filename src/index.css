@@ -148,3 +148,31 @@ body {
   opacity: 0;
   -webkit-animation: fadeInUp 0.4s ease-out forwards;
 }
+
+/* Slider styles for StatsEditor */
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: 2px solid #3b82f6;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: 2px solid #3b82f6;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  border: none;
+}
+
+.slider::-moz-range-track {
+  background: transparent;
+  border: none;
+}
