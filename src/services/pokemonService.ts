@@ -410,18 +410,28 @@ export interface PokemonRating {
 
 const RATINGS_COLLECTION = 'pokemon_ratings';
 
-// Convert star rating to points using a progressive system
+// Convert star rating to points using a progressive system (supports half-stars)
 export const starsToPoints = (stars: number): number => {
   const pointMap: { [key: number]: number } = {
+    0.5: 5,
     1: 10,
+    1.5: 12.5,
     2: 15,
+    2.5: 18,
     3: 21,
+    3.5: 24.5,
     4: 28,
+    4.5: 32,
     5: 36,
+    5.5: 40.5,
     6: 45,
+    6.5: 50,
     7: 55,
+    7.5: 60.5,
     8: 66,
+    8.5: 72,
     9: 78,
+    9.5: 84.5,
     10: 91
   };
   return pointMap[stars] || 0;

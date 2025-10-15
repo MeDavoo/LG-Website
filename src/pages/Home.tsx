@@ -142,7 +142,12 @@ const Home = () => {
       
       // Find all ratings made by this device for existing Pokemon only
       const userRatings: number[] = [];
-      const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 };
+      const ratingDistribution: { [key: string]: number } = {};
+      
+      // Initialize all possible ratings from 0.5 to 10 (in 0.5 increments)
+      for (let i = 0.5; i <= 10; i += 0.5) {
+        ratingDistribution[i.toString()] = 0;
+      }
       
       Object.entries(allRatings).forEach(([pokemonId, pokemonRating]) => {
         // Only count ratings for Pokemon that still exist
@@ -150,8 +155,11 @@ const Home = () => {
           const userRating = pokemonRating.ratings[deviceId];
           if (userRating) {
             userRatings.push(userRating);
-            if (userRating >= 1 && userRating <= 10) {
-              ratingDistribution[userRating as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10]++;
+            if (userRating >= 0.5 && userRating <= 10) {
+              const ratingKey = userRating.toString();
+              if (ratingDistribution.hasOwnProperty(ratingKey)) {
+                ratingDistribution[ratingKey]++;
+              }
             }
           }
         }
@@ -885,10 +893,11 @@ const Home = () => {
         const totalVotes = Object.keys(newRatings).length;
         const averageRating = totalVotes > 0 ? totalRatings / totalVotes : 0;
         
-        // Calculate total points using the starsToPoints function
+        // Calculate total points using the starsToPoints function (supports half-stars)
         const starsToPoints = (stars: number): number => {
           const pointMap: { [key: number]: number } = {
-            1: 10, 2: 15, 3: 21, 4: 28, 5: 36, 6: 45, 7: 55, 8: 66, 9: 78, 10: 91
+            0.5: 5, 1: 10, 1.5: 12.5, 2: 15, 2.5: 18, 3: 21, 3.5: 24.5, 4: 28, 4.5: 32, 
+            5: 36, 5.5: 40.5, 6: 45, 6.5: 50, 7: 55, 7.5: 60.5, 8: 66, 8.5: 72, 9: 78, 9.5: 84.5, 10: 91
           };
           return pointMap[stars] || 0;
         };
@@ -1093,7 +1102,7 @@ const Home = () => {
           averageRating: 0,
           totalRatings: 0,
           totalUnrated: pokemonSlots.filter(p => p.hasArt && p.firebaseId).length,
-          ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
+          ratingDistribution: {}
         });
         
         // Reload data to reflect changes
@@ -1184,6 +1193,9 @@ const Home = () => {
 
   // Rating distribution dropdown state (closed by default)
   const [isRatingDistributionCollapsed, setIsRatingDistributionCollapsed] = useState(true);
+  
+  // Sort state for rating distribution (false = most to least, true = least to most)
+  const [isRatingDistributionSortAscending, setIsRatingDistributionSortAscending] = useState(false);
 
   // Toggle collapse state for a section
   const toggleSection = (section: keyof typeof collapsedSections) => {
@@ -1213,12 +1225,12 @@ const Home = () => {
     averageRating: number;
     totalRatings: number;
     totalUnrated: number;
-    ratingDistribution: { [star: number]: number };
+    ratingDistribution: { [key: string]: number };
   }>({
     averageRating: 0,
     totalRatings: 0,
     totalUnrated: 0,
-    ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
+    ratingDistribution: {}
   });
 
   // Get unique artists from the data
@@ -1847,95 +1859,113 @@ const Home = () => {
                 {/* Rating Distribution Header with Toggle */}
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-white font-semibold text-xs">Rating Distribution</h4>
-                  <button
-                    onClick={() => setIsRatingDistributionCollapsed(!isRatingDistributionCollapsed)}
-                    className="text-white/70 hover:text-white transition-colors text-sm"
-                  >
-                    {isRatingDistributionCollapsed ? '▼' : '▲'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsRatingDistributionSortAscending(!isRatingDistributionSortAscending)}
+                      className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                        isRatingDistributionSortAscending 
+                          ? 'bg-blue-500/70 hover:bg-blue-500/80 text-white' 
+                          : 'bg-gray-600/50 hover:bg-gray-600/70 text-white/80'
+                      }`}
+                      title={`Currently: ${isRatingDistributionSortAscending ? 'Sorted by vote count (most voted first)' : 'Ordered by star rating (10★ to 0.5★)'}`}
+                    >
+                      Sort
+                    </button>
+                    <button
+                      onClick={() => setIsRatingDistributionCollapsed(!isRatingDistributionCollapsed)}
+                      className="text-white/70 hover:text-white transition-colors text-sm"
+                    >
+                      {isRatingDistributionCollapsed ? '▼' : '▲'}
+                    </button>
+                  </div>
                 </div>
                 
-                {/* Rating Distribution Content (Collapsible) */}
+                {/* Rating Distribution Content (Collapsible) - Compact List */}
                 {!isRatingDistributionCollapsed && (
-                  <div className="space-y-1">
-                    {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(star => (
-                      <div key={star} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center">
-                          <span className="text-yellow-300 w-4 text-center font-bold">{star}</span>
-                          <svg
-                            className="w-3 h-3 text-yellow-300 ml-1"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        </div>
-                        <button
-                          onClick={() => {
-                            if (userRatingFilter === star) {
-                              // If already filtering by this star, clear the filter
-                              setUserRatingFilter(null);
-                            } else {
-                              // Set filter to this star rating
-                              setUserRatingFilter(star);
-                            }
-                          }}
-                          className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
-                            userRatingFilter === star
-                              ? 'bg-blue-500 text-white'
-                              : userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10] > 0
-                              ? 'bg-white/20 text-white/90 hover:bg-white/30'
-                              : 'bg-white/10 text-white/50 cursor-default'
-                          }`}
-                          disabled={userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10] === 0}
-                          title={userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10] > 0 ? `Filter Pokemon you rated ${star} stars` : `No Pokemon rated ${star} stars`}
-                        >
-                          {userRatingStats.ratingDistribution[star as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10]}
-                        </button>
-                      </div>
-                    ))}
-                    
-                    {/* Unrated Pokemon Button */}
-                    <div className="flex items-center justify-between text-xs border-t border-white/10 pt-2 mt-2">
-                      <div className="flex items-center">
-                        <span className="text-gray-300 w-4 text-center font-bold">0</span>
-                        <svg
-                          className="w-3 h-3 text-gray-300 ml-1"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-gray-300 ml-1 text-xs">Unrated</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (userRatingFilter === 0) {
-                            // If already filtering unrated, clear the filter
-                            setUserRatingFilter(null);
+                  <div className="space-y-2">
+                    {/* Compact Rating List - 2 columns to prevent scrolling */}
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                      {(() => {
+                        // Get all ratings with their counts
+                        const ratingsWithCounts = [10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5]
+                          .map(star => ({
+                            star,
+                            count: userRatingStats.ratingDistribution[star.toString()] || 0
+                          }))
+                          .filter(item => item.count > 0); // Only show ratings that have counts
+                        
+                        // Sort based on toggle state
+                        const sortedRatings = ratingsWithCounts.sort((a, b) => {
+                          if (isRatingDistributionSortAscending) {
+                            // When sort is ON (blue): Sort by count (most votes first)
+                            return b.count - a.count; // Most to least votes
                           } else {
-                            // Set filter to show unrated Pokemon
-                            setUserRatingFilter(0);
+                            // When sort is OFF (gray): Sort by star rating (highest stars first)
+                            return b.star - a.star; // 10★ to 0.5★
                           }
-                        }}
-                        className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
-                          userRatingFilter === 0
-                            ? 'bg-orange-500 text-white'
-                            : userRatingStats.totalUnrated > 0
-                            ? 'bg-white/20 text-white/90 hover:bg-white/30'
-                            : 'bg-white/10 text-white/50 cursor-default'
-                        }`}
-                        disabled={userRatingStats.totalUnrated === 0}
-                        title={userRatingStats.totalUnrated > 0 ? `Show ${userRatingStats.totalUnrated} Pokemon you haven't rated yet` : `All Pokemon have been rated`}
-                      >
-                        {userRatingStats.totalUnrated}
-                      </button>
+                        });
+                        
+                        return sortedRatings.map(({ star, count }) => (
+                          <button
+                            key={star}
+                            onClick={() => {
+                              if (userRatingFilter === star) {
+                                setUserRatingFilter(null);
+                              } else {
+                                setUserRatingFilter(star);
+                              }
+                            }}
+                            className={`flex items-center justify-between px-2 py-1 rounded text-xs transition-all ${
+                              userRatingFilter === star
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-white/10 hover:bg-white/20 text-white/90'
+                            }`}
+                            title={`Filter Pokemon you rated ${star} stars (${count} Pokemon)`}
+                          >
+                            <div className="flex items-center gap-1">
+                              <span className="text-yellow-300 font-bold">{star}</span>
+                              <svg className="w-2.5 h-2.5 text-yellow-300" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                            </div>
+                            <span className="font-semibold">{count}</span>
+                          </button>
+                        ));
+                      })()}
                     </div>
                     
-                    {/* Delete User Data Button - Hidden inside collapse */}
+                    {/* Unrated Pokemon Button */}
+                    {userRatingStats.totalUnrated > 0 && (
+                      <div className="pt-1 border-t border-white/10">
+                        <button
+                          onClick={() => {
+                            if (userRatingFilter === 0) {
+                              setUserRatingFilter(null);
+                            } else {
+                              setUserRatingFilter(0);
+                            }
+                          }}
+                          className={`w-full flex items-center justify-between px-2 py-1 rounded text-xs transition-all ${
+                            userRatingFilter === 0
+                              ? 'bg-orange-500 text-white'
+                              : 'bg-white/10 hover:bg-white/20 text-white/90'
+                          }`}
+                          title={`Show ${userRatingStats.totalUnrated} Pokemon you haven't rated yet`}
+                        >
+                          <div className="flex items-center gap-1">
+                            <svg className="w-2.5 h-2.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Unrated</span>
+                          </div>
+                          <span className="font-semibold">{userRatingStats.totalUnrated}</span>
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* Delete User Data Button */}
                     {(userRatingStats.totalRatings > 0 || userFavorites.length > 0) && (
-                      <div className="mt-3 pt-3 border-t border-white/10">
+                      <div className="pt-1 border-t border-white/10">
                         <button
                           onClick={() => {
                             if (window.confirm('Are you sure? This will permanently delete all your ratings and favorites. This action cannot be undone.')) {
@@ -2713,32 +2743,85 @@ const Home = () => {
                       </div>
                     )}
                     
-                    {/* Star Rating System */}
+                    {/* Star Rating System with Half-Stars */}
                     <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/10">
-                      <div className="flex justify-center items-center flex-wrap gap-1 mb-2">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
-                          <button
-                            key={star}
-                            onClick={() => handleStarRating(selectedPokemon.firebaseId!, star)}
-                            onMouseEnter={() => setHoveredStar(star)}
-                            onMouseLeave={() => setHoveredStar(0)}
-                            className="p-0.5 transition-all duration-200 transform hover:scale-110 flex-shrink-0"
-                            title={`Rate ${star} star${star > 1 ? 's' : ''}`}
-                          >
-                            <svg
-                              className={`w-5 h-5 transition-all duration-200 ${
-                                star <= (hoveredStar || getUserRating(selectedPokemon.firebaseId!))
-                                  ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(255,255,0,0.8)]'
-                                  : 'text-gray-400'
-                              }`}
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
-                          </button>
-                        ))}
+                      <div className="flex justify-center items-center flex-wrap mb-2">
+                        <div className="relative flex justify-center items-center">
+                          <div className="flex justify-center items-center flex-wrap" style={{ gap: '4px' }}>
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => {
+                              const currentRating = getUserRating(selectedPokemon.firebaseId!);
+                              const hoverRating = hoveredStar;
+                              const displayRating = hoverRating || currentRating;
+                              
+                              return (
+                                <div key={star} className="relative" style={{ margin: '-2px' }}>
+                                  {/* Star background (gray) */}
+                                  <svg
+                                    className="w-8 h-8 text-gray-400 absolute"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                  </svg>
+                                  
+                                  {/* Star fill (yellow) with better glow for half-stars */}
+                                  <svg
+                                    className="w-8 h-8 text-yellow-400 relative transition-opacity duration-75"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                    style={{
+                                      filter: displayRating >= star - 0.5 ? 'drop-shadow(0 0 6px rgba(255,255,0,0.7))' : 'none',
+                                      clipPath: displayRating >= star ? 'none' : 
+                                               displayRating >= star - 0.5 ? 'polygon(0 0, 50% 0, 50% 100%, 0 100%)' : 
+                                               'polygon(0 0, 0 0, 0 100%, 0 100%)'
+                                    }}
+                                  >
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                  </svg>
+                                  
+                                  {/* Extended button overlay for half-star (left half + overlap) */}
+                                  <button
+                                    className="absolute z-10 hover:bg-white/5 rounded-l transition-colors duration-75"
+                                    style={{
+                                      left: '-2px',
+                                      top: '0',
+                                      width: 'calc(50% + 2px)',
+                                      height: '100%'
+                                    }}
+                                    onClick={() => handleStarRating(selectedPokemon.firebaseId!, star - 0.5)}
+                                    onMouseEnter={() => setHoveredStar(star - 0.5)}
+                                    onMouseLeave={() => setHoveredStar(0)}
+                                    title={`Rate ${star - 0.5} stars`}
+                                  />
+                                  
+                                  {/* Extended button overlay for full star (right half + overlap) */}
+                                  <button
+                                    className="absolute z-10 hover:bg-white/5 rounded-r transition-colors duration-75"
+                                    style={{
+                                      left: 'calc(50% - 2px)',
+                                      top: '0',
+                                      width: 'calc(50% + 2px)',
+                                      height: '100%'
+                                    }}
+                                    onClick={() => handleStarRating(selectedPokemon.firebaseId!, star)}
+                                    onMouseEnter={() => setHoveredStar(star)}
+                                    onMouseLeave={() => setHoveredStar(0)}
+                                    title={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                          
+                          {/* Current rating display positioned to the right of stars */}
+                          {selectedPokemon.firebaseId && getUserRating(selectedPokemon.firebaseId!) > 0 && (
+                            <span className="absolute left-full ml-3 text-yellow-300/85 text-sm font-semibold whitespace-nowrap">
+                              {getUserRating(selectedPokemon.firebaseId!)}★
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      
                       <div className="text-center">
                         {selectedPokemon.firebaseId && (
                           globalRankings[selectedPokemon.firebaseId] ? (
