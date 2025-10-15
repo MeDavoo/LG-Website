@@ -721,6 +721,30 @@ const Home = () => {
     return pokemonRatings[pokemonId]?.ratings[deviceId] || 0;
   };
 
+  // Helper functions for user rating visualization
+  const getUserRatingColor = (rating: number): string => {
+    if (rating === 0) return 'bg-gray-500/20 border-gray-500/40'; // Unrated
+    if (rating >= 9) return 'bg-gradient-to-r from-yellow-400/30 to-yellow-300/30 border-yellow-400/60'; // 9-10 stars - Gold
+    if (rating >= 7) return 'bg-gradient-to-r from-green-400/30 to-green-300/30 border-green-400/60'; // 7-8 stars - Green
+    if (rating >= 5) return 'bg-gradient-to-r from-blue-400/30 to-blue-300/30 border-blue-400/60'; // 5-6 stars - Blue
+    if (rating >= 3) return 'bg-gradient-to-r from-orange-400/30 to-orange-300/30 border-orange-400/60'; // 3-4 stars - Orange
+    return 'bg-gradient-to-r from-red-400/30 to-red-300/30 border-red-400/60'; // 1-2 stars - Red
+  };
+
+  const getUserRatingBorderColor = (rating: number): string => {
+    if (rating === 0) return 'border-l-gray-500 border-l-4'; // Unrated
+    if (rating >= 9) return 'border-l-yellow-400 border-l-4'; // 9-10 stars - Gold
+    if (rating >= 7) return 'border-l-green-400 border-l-4'; // 7-8 stars - Green
+    if (rating >= 5) return 'border-l-blue-400 border-l-4'; // 5-6 stars - Blue
+    if (rating >= 3) return 'border-l-orange-400 border-l-4'; // 3-4 stars - Orange
+    return 'border-l-red-400 border-l-4'; // 1-2 stars - Red
+  };
+
+  const getUserRatingText = (rating: number): string => {
+    if (rating === 0) return 'Unrated';
+    return `${rating}★`;
+  };
+
   // Tier system functions
   const getTierFromRating = (averageRating: number): string => {
     if (averageRating >= 9.3) return 'SS';
@@ -2186,8 +2210,39 @@ const Home = () => {
                   /* List View */
                   <div className="space-y-2">
                     {sortedPokemon.map((pokemon, index) => (
-                      <div key={pokemon.id} className={`flex items-center transition-all duration-300 ease-in-out ${showTiers ? 'gap-2' : 'gap-0'}`}>
-                        {/* Pokemon List Item - Shrinks to make room for tier images */}
+                      <div key={pokemon.id} className={`flex items-center transition-all duration-300 ease-in-out ${
+                        (showTiers || (userRatingSortOrder !== 'none' || userRatingFilter !== null)) ? 'gap-2' : 'gap-0'
+                      }`}>
+                        {/* User Rating Bubble - Left side */}
+                        <div className={`flex-shrink-0 flex items-center justify-center transition-all duration-300 ease-in-out ${
+                          (userRatingSortOrder !== 'none' || userRatingFilter !== null) && pokemon.firebaseId 
+                            ? 'w-16 h-16 opacity-100' 
+                            : 'w-0 h-16 opacity-0 overflow-hidden'
+                        }`}>
+                          {(userRatingSortOrder !== 'none' || userRatingFilter !== null) && pokemon.firebaseId ? (
+                            <div className={`flex items-center justify-center w-14 h-14 rounded-lg text-xs font-bold transition-all duration-300 ${
+                              getUserRating(pokemon.firebaseId) === 0 
+                                ? 'bg-gray-600 text-gray-200' 
+                                : getUserRating(pokemon.firebaseId) >= 9
+                                ? 'bg-yellow-500 text-black'
+                                : getUserRating(pokemon.firebaseId) >= 7
+                                ? 'bg-green-500 text-white'
+                                : getUserRating(pokemon.firebaseId) >= 5
+                                ? 'bg-blue-500 text-white'
+                                : getUserRating(pokemon.firebaseId) >= 3
+                                ? 'bg-orange-500 text-white'
+                                : 'bg-red-500 text-white'
+                            }`}>
+                              <span className="text-center leading-tight">
+                                {getUserRatingText(getUserRating(pokemon.firebaseId))}
+                              </span>
+                            </div>
+                          ) : (userRatingSortOrder !== 'none' || userRatingFilter !== null) ? (
+                            <div className="w-14 h-14"></div>
+                          ) : null}
+                        </div>
+                        
+                        {/* Pokemon List Item - Shrinks to make room for rating bubbles and tier images */}
                         <div
                           data-pokemon-id={pokemon.id}
                           draggable={isPositionEditorMode && pokemon.hasArt}
@@ -2202,7 +2257,14 @@ const Home = () => {
                               setShowActionsDropdown(false);
                             }
                           }}
-                          className={`flex items-center p-2 m-1 rounded-lg border transition-all duration-300 ease-in-out animate-fade-in-up ${showTiers ? 'flex-1' : 'w-full'} ${
+                          className={`flex items-center p-2 m-1 rounded-lg border transition-all duration-300 ease-in-out animate-fade-in-up ${
+                            (showTiers || (userRatingSortOrder !== 'none' || userRatingFilter !== null)) ? 'flex-1' : 'w-full'
+                          } ${
+                            // User rating visual indicators when user rating sort is active
+                            userRatingSortOrder !== 'none' && pokemon.firebaseId
+                              ? `${getUserRatingColor(getUserRating(pokemon.firebaseId))} ${getUserRatingBorderColor(getUserRating(pokemon.firebaseId))}`
+                              : ''
+                          } ${
                             isPositionEditorMode 
                               ? pokemon.hasArt 
                                 ? 'cursor-grab active:cursor-grabbing bg-blue-500/10 border-blue-400/50 hover:bg-blue-500/20 hover:border-blue-400' 
@@ -2212,10 +2274,16 @@ const Home = () => {
                                   ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
                                   : pokemon.hasArt 
                                   ? pokemon.firebaseId && isPokemonFavorited(pokemon.firebaseId)
-                                    ? 'bg-red-300/10 border-red-400/30 hover:bg-red-500/20 hover:border-red-400/50'
+                                    ? userRatingSortOrder === 'none' 
+                                      ? 'bg-red-300/10 border-red-400/30 hover:bg-red-500/20 hover:border-red-400/50'
+                                      : 'hover:bg-red-500/20 hover:border-red-400/50'
                                     : (pokemon.evolutionStage === 4 
-                                      ? 'bg-orange-200/10 border-orange-300/20 hover:bg-orange-200/20 hover:border-orange-300/30' 
-                                      : 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40')
+                                      ? userRatingSortOrder === 'none'
+                                        ? 'bg-orange-200/10 border-orange-300/20 hover:bg-orange-200/20 hover:border-orange-300/30'
+                                        : 'hover:bg-orange-200/20 hover:border-orange-300/30'
+                                      : userRatingSortOrder === 'none'
+                                        ? 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40'
+                                        : 'hover:bg-white/20 hover:border-white/40')
                                   : 'bg-white/5 border-white/10 hover:bg-white/10'
                               }`
                         } ${isDragging && draggedPokemon?.id === pokemon.id ? 'opacity-50 scale-95' : ''}`}
@@ -2314,6 +2382,7 @@ const Home = () => {
                               <span>Empty</span>
                             </div>
                           )}
+                          
                           {pokemon.firebaseId && (
                             <div className="flex items-center gap-1">
                               {/* Star Rating and Ranking */}
@@ -3310,7 +3379,40 @@ const Home = () => {
                 {/* Mobile Pokemon Grid */}
                 <div className="space-y-1 max-h-96 overflow-y-auto custom-scrollbar">
                   {sortedPokemon.map((pokemon) => (
-                    <div key={pokemon.id} className={`flex items-center transition-all duration-300 ease-in-out ${showTiers ? 'gap-2' : 'gap-0'}`}>
+                    <div key={pokemon.id} className={`flex items-center transition-all duration-300 ease-in-out ${
+                      (showTiers || (userRatingSortOrder !== 'none' || userRatingFilter !== null)) ? 'gap-2' : 'gap-0'
+                    }`}>
+                      {/* User Rating Bubble - Left side (Mobile) */}
+                      <div className={`flex-shrink-0 flex items-center justify-center transition-all duration-300 ease-in-out ${
+                        (userRatingSortOrder !== 'none' || userRatingFilter !== null) && pokemon.firebaseId 
+                          ? 'w-12 h-12 opacity-100' 
+                          : 'w-0 h-12 opacity-0 overflow-hidden'
+                      }`}>
+                        {(userRatingSortOrder !== 'none' || userRatingFilter !== null) && pokemon.firebaseId ? (
+                          <div className={`flex items-center justify-center w-10 h-10 rounded-lg text-xs font-bold transition-all duration-300 ${
+                            getUserRating(pokemon.firebaseId) === 0 
+                              ? 'bg-gray-600 text-gray-200' 
+                              : getUserRating(pokemon.firebaseId) >= 9
+                              ? 'bg-yellow-500 text-black'
+                              : getUserRating(pokemon.firebaseId) >= 7
+                              ? 'bg-green-500 text-white'
+                              : getUserRating(pokemon.firebaseId) >= 5
+                              ? 'bg-blue-500 text-white'
+                              : getUserRating(pokemon.firebaseId) >= 3
+                              ? 'bg-orange-500 text-white'
+                              : 'bg-red-500 text-white'
+                          }`}>
+                            <span className="text-center leading-tight text-xs">
+                              {getUserRating(pokemon.firebaseId) === 0 
+                                ? 'NR' 
+                                : `★${getUserRating(pokemon.firebaseId)}`}
+                            </span>
+                          </div>
+                        ) : (userRatingSortOrder !== 'none' || userRatingFilter !== null) ? (
+                          <div className="w-10 h-10"></div>
+                        ) : null}
+                      </div>
+                      
                       {/* Pokemon List Item */}
                       <div
                         data-pokemon-id={pokemon.id}
@@ -3320,7 +3422,9 @@ const Home = () => {
                           setShowEditForm(false);
                           setShowActionsDropdown(false);
                         }}
-                        className={`flex items-center p-2 rounded-lg border transition-all duration-300 ease-in-out ${showTiers ? 'flex-1' : 'w-full'} ${
+                        className={`flex items-center p-2 rounded-lg border transition-all duration-300 ease-in-out ${
+                          (showTiers || (userRatingSortOrder !== 'none' || userRatingFilter !== null)) ? 'flex-1' : 'w-full'
+                        } ${
                           selectedPokemon?.id === pokemon.id
                             ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
                             : pokemon.hasArt 
