@@ -1886,13 +1886,13 @@ const Home = () => {
                     {/* Compact Rating List - 2 columns to prevent scrolling */}
                     <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                       {(() => {
-                        // Get all ratings with their counts
+                        // Get all ratings with their counts (including 0 counts)
                         const ratingsWithCounts = [10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5]
                           .map(star => ({
                             star,
                             count: userRatingStats.ratingDistribution[star.toString()] || 0
-                          }))
-                          .filter(item => item.count > 0); // Only show ratings that have counts
+                          }));
+                          // Removed the filter - now shows all ratings including 0 counts
                         
                         // Sort based on toggle state
                         const sortedRatings = ratingsWithCounts.sort((a, b) => {
@@ -1909,18 +1909,22 @@ const Home = () => {
                           <button
                             key={star}
                             onClick={() => {
+                              if (count === 0) return; // Don't allow clicking if no votes
                               if (userRatingFilter === star) {
                                 setUserRatingFilter(null);
                               } else {
                                 setUserRatingFilter(star);
                               }
                             }}
+                            disabled={count === 0}
                             className={`flex items-center justify-between px-2 py-1 rounded text-xs transition-all ${
                               userRatingFilter === star
                                 ? 'bg-blue-500 text-white'
-                                : 'bg-white/10 hover:bg-white/20 text-white/90'
+                                : count > 0
+                                ? 'bg-white/10 hover:bg-white/20 text-white/90'
+                                : 'bg-white/5 text-white/40 cursor-not-allowed'
                             }`}
-                            title={`Filter Pokemon you rated ${star} stars (${count} Pokemon)`}
+                            title={count > 0 ? `Filter Pokemon you rated ${star} stars (${count} Pokemon)` : `No Pokemon rated ${star} stars`}
                           >
                             <div className="flex items-center gap-1">
                               <span className="text-yellow-300 font-bold">{star}</span>
