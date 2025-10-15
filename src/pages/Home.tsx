@@ -1136,6 +1136,7 @@ const Home = () => {
   
   // Rating sorting and tier display states
   const [ratingSortOrder, setRatingSortOrder] = useState<'none' | 'ascending' | 'descending'>('none'); // Sort by global ranking
+  const [userRatingSortOrder, setUserRatingSortOrder] = useState<'none' | 'best' | 'worst'>('none'); // Sort by user's own ratings
   const [showTiers, setShowTiers] = useState(true); // Toggle tier letters display
 
   // View mode state for list layout
@@ -1240,7 +1241,7 @@ const Home = () => {
   const allTypes = Array.from(new Set(pokemonSlots.filter(p => p.hasArt && p.types).flatMap(p => p.types!)));
 
   // Check if any filters are active
-  const hasActiveFilters = searchTerm || selectedTypes.length > 0 || selectedArtists.length > 0 || uniqueOnly || evolutionFilter !== 'all' || userRatingFilter !== null || ratingSortOrder !== 'none' || showFavoritesOnly;
+  const hasActiveFilters = searchTerm || selectedTypes.length > 0 || selectedArtists.length > 0 || uniqueOnly || evolutionFilter !== 'all' || userRatingFilter !== null || ratingSortOrder !== 'none' || userRatingSortOrder !== 'none' || showFavoritesOnly;
 
   // Filter pokemon based on current filters
   const filteredPokemon = pokemonSlots.filter(pokemon => {
@@ -1339,8 +1340,26 @@ const Home = () => {
     return true;
   });
 
-  // Sort filtered Pokemon by global ranking if rating sort is enabled
+  // Sort filtered Pokemon by global ranking or user rating if sorting is enabled
   const sortedPokemon = (() => {
+    // If user rating sort is active, prioritize it over global ranking sort
+    if (userRatingSortOrder !== 'none') {
+      const deviceId = getDeviceId();
+      const pokemonWithUserRatings = filteredPokemon.map(pokemon => ({
+        ...pokemon,
+        userRating: pokemon.firebaseId ? (pokemonRatings[pokemon.firebaseId]?.ratings[deviceId] || 0) : 0
+      }));
+
+      if (userRatingSortOrder === 'best') {
+        // Sort by highest user rating first (10, 9, 8... then unrated at bottom)
+        return pokemonWithUserRatings.sort((a, b) => b.userRating - a.userRating);
+      } else {
+        // Sort by lowest user rating first (unrated first, then 0.5, 1, 2...)
+        return pokemonWithUserRatings.sort((a, b) => a.userRating - b.userRating);
+      }
+    }
+
+    // Global ranking sort (original logic)
     if (ratingSortOrder === 'none') {
       return filteredPokemon;
     }
@@ -1813,6 +1832,7 @@ const Home = () => {
                       setEvolutionFilter('all');
                       setUserRatingFilter(null);
                       setRatingSortOrder('none');
+                      setUserRatingSortOrder('none');
                       setShowFavoritesOnly(false);
                     }}
                     className="w-full px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm"
@@ -1963,6 +1983,27 @@ const Home = () => {
                             <span>Unrated</span>
                           </div>
                           <span className="font-semibold">{userRatingStats.totalUnrated}</span>
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* User Rating Sort Button */}
+                    {userRatingStats.totalRatings > 0 && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setUserRatingSortOrder(userRatingSortOrder === 'none' ? 'best' : userRatingSortOrder === 'best' ? 'worst' : 'none')}
+                          className={`flex-1 px-2 py-1 rounded text-xs transition-colors ${
+                            userRatingSortOrder === 'none'
+                              ? 'bg-white/10 hover:bg-white/20 text-white/70'
+                              : userRatingSortOrder === 'best'
+                              ? 'bg-green-500/60 text-white'
+                              : 'bg-red-500/60 text-white'
+                          }`}
+                          title="Sort Pokemon by your personal ratings"
+                        >
+                          {userRatingSortOrder === 'none' ? 'Sort by My Ratings' : 
+                           userRatingSortOrder === 'best' ? 'Best → Worst' : 
+                           'Worst → Best'}
                         </button>
                       </div>
                     )}
@@ -3256,6 +3297,7 @@ const Home = () => {
                         setEvolutionFilter('all');
                         setUserRatingFilter(null);
                         setRatingSortOrder('none');
+                        setUserRatingSortOrder('none');
                         setShowFavoritesOnly(false);
                       }}
                       className="px-2 py-1 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-red-200 text-xs font-medium transition-colors"
@@ -3440,6 +3482,7 @@ const Home = () => {
                       setEvolutionFilter('all');
                       setUserRatingFilter(null);
                       setRatingSortOrder('none');
+                      setUserRatingSortOrder('none');
                       setShowFavoritesOnly(false);
                     }}
                     className="px-3 py-1 bg-red-500/80 text-white rounded-lg hover:bg-red-600/80 transition-colors text-xs font-semibold"
@@ -3675,6 +3718,27 @@ const Home = () => {
                     <p>Average Rating: <span className="text-white font-semibold">{userRatingStats.averageRating.toFixed(1)}/10</span></p>
                     <p>Total Ratings: <span className="text-white font-semibold">{userRatingStats.totalRatings}</span></p>
                   </div>
+                  
+                  {/* User Rating Sort Button for mobile */}
+                  {userRatingStats.totalRatings > 0 && (
+                    <div className="mt-2">
+                      <button
+                        onClick={() => setUserRatingSortOrder(userRatingSortOrder === 'none' ? 'best' : userRatingSortOrder === 'best' ? 'worst' : 'none')}
+                        className={`w-full px-2 py-1 rounded text-xs transition-colors ${
+                          userRatingSortOrder === 'none'
+                            ? 'bg-white/10 hover:bg-white/20 text-white/70'
+                            : userRatingSortOrder === 'best'
+                            ? 'bg-green-500/60 text-white'
+                            : 'bg-red-500/60 text-white'
+                        }`}
+                        title="Sort Pokemon by your personal ratings"
+                      >
+                        {userRatingSortOrder === 'none' ? 'Sort by My Ratings' : 
+                         userRatingSortOrder === 'best' ? 'Best → Worst' : 
+                         'Worst → Best'}
+                      </button>
+                    </div>
+                  )}
                   
                   {/* Delete User Data Button for mobile */}
                   {(userRatingStats.totalRatings > 0 || userFavorites.length > 0) && (
