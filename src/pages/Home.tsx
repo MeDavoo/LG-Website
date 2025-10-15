@@ -2311,9 +2311,9 @@ const Home = () => {
                           className={`flex items-center p-2 m-1 rounded-lg border transition-all duration-300 ease-in-out animate-fade-in-up ${
                             (showTiers || (userRatingSortOrder !== 'none' || userRatingFilter !== null)) ? 'flex-1' : 'w-full'
                           } ${
-                            // User rating visual indicators when user rating sort is active
+                            // User rating border indicators when user rating sort is active
                             userRatingSortOrder !== 'none' && pokemon.firebaseId
-                              ? `${getUserRatingColor(getUserRating(pokemon.firebaseId))} ${getUserRatingBorderColor(getUserRating(pokemon.firebaseId))}`
+                              ? `${getUserRatingBorderColor(getUserRating(pokemon.firebaseId))}`
                               : ''
                           } ${
                             isPositionEditorMode 
@@ -2518,6 +2518,11 @@ const Home = () => {
                           }
                         }}
                         className={`relative bg-white/10 rounded-lg border transition-all duration-300 ease-in-out animate-fade-in-up overflow-hidden ${
+                          // User rating border indicators when user rating sort is active
+                          (userRatingSortOrder !== 'none' || userRatingFilter !== null) && pokemon.firebaseId
+                            ? `${getUserRatingBorderColor(getUserRating(pokemon.firebaseId))}`
+                            : ''
+                        } ${
                           isPositionEditorMode 
                             ? pokemon.hasArt 
                               ? 'cursor-grab active:cursor-grabbing bg-blue-500/10 border-blue-400/50 hover:bg-blue-500/20 hover:border-blue-400' 
@@ -2527,8 +2532,12 @@ const Home = () => {
                                   ? 'bg-yellow-500/20 border-yellow-400'
                                   : pokemon.hasArt
                                   ? pokemon.firebaseId && isPokemonFavorited(pokemon.firebaseId)
-                                    ? 'bg-red-500/10 border-red-400/30 hover:bg-red-500/20 hover:border-red-400/50'
-                                    : 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40'
+                                    ? (userRatingSortOrder === 'none' && userRatingFilter === null)
+                                      ? 'bg-red-500/10 border-red-400/30 hover:bg-red-500/20 hover:border-red-400/50'
+                                      : 'hover:bg-red-500/20 hover:border-red-400/50'
+                                    : (userRatingSortOrder === 'none' && userRatingFilter === null)
+                                      ? 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40'
+                                      : 'hover:bg-white/20 hover:border-white/40'
                                   : 'bg-gray-500/10 border-gray-400/20'
                               }`
                         } ${
@@ -2588,6 +2597,17 @@ const Home = () => {
                                 <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
                               </svg>
                             </button>
+                          )}
+                          
+                          {/* User Rating Badge - Bottom Left */}
+                          {(userRatingSortOrder !== 'none' || userRatingFilter !== null) && pokemon.firebaseId && (
+                            <div className={`absolute bottom-1 left-1 flex items-center justify-center w-8 h-5 rounded text-xs font-bold transition-all duration-300 ${
+                              getUserRatingBubbleColor(getUserRating(pokemon.firebaseId))
+                            }`}>
+                              <span className="text-center leading-none">
+                                {getUserRating(pokemon.firebaseId) === 0 ? 'NR' : getUserRating(pokemon.firebaseId)}
+                              </span>
+                            </div>
                           )}
                         </div>
                         
