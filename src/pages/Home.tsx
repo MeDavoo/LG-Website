@@ -723,26 +723,87 @@ const Home = () => {
 
   // Helper functions for user rating visualization
   const getUserRatingColor = (rating: number): string => {
-    if (rating === 0) return 'bg-gray-500/20 border-gray-500/40'; // Unrated
-    if (rating >= 9) return 'bg-gradient-to-r from-yellow-400/30 to-yellow-300/30 border-yellow-400/60'; // 9-10 stars - Gold
-    if (rating >= 7) return 'bg-gradient-to-r from-green-400/30 to-green-300/30 border-green-400/60'; // 7-8 stars - Green
-    if (rating >= 5) return 'bg-gradient-to-r from-blue-400/30 to-blue-300/30 border-blue-400/60'; // 5-6 stars - Blue
-    if (rating >= 3) return 'bg-gradient-to-r from-orange-400/30 to-orange-300/30 border-orange-400/60'; // 3-4 stars - Orange
-    return 'bg-gradient-to-r from-red-400/30 to-red-300/30 border-red-400/60'; // 1-2 stars - Red
+    // Gentle background colors for list items - very subtle and flowing
+    if (rating === 0) return 'bg-gray-400/8 border-gray-400/15'; // Unrated
+    if (rating === 0.5) return 'bg-red-400/8 border-red-400/15'; // Deep red tint
+    if (rating === 1) return 'bg-red-400/10 border-red-400/18'; // Red
+    if (rating === 1.5) return 'bg-red-300/10 border-red-300/18'; // Lighter red
+    if (rating === 2) return 'bg-orange-500/8 border-orange-500/15'; // Dark orange
+    if (rating === 2.5) return 'bg-orange-400/8 border-orange-400/15'; // Orange
+    if (rating === 3) return 'bg-orange-300/10 border-orange-300/18'; // Light orange
+    if (rating === 3.5) return 'bg-amber-400/8 border-amber-400/15'; // Amber
+    if (rating === 4) return 'bg-yellow-500/8 border-yellow-500/15'; // Deep yellow
+    if (rating === 4.5) return 'bg-yellow-400/8 border-yellow-400/15'; // Yellow
+    if (rating === 5) return 'bg-cyan-400/8 border-cyan-400/15'; // Cyan
+    if (rating === 5.5) return 'bg-sky-400/8 border-sky-400/15'; // Sky blue
+    if (rating === 6) return 'bg-blue-400/10 border-blue-400/18'; // Blue
+    if (rating === 6.5) return 'bg-indigo-400/8 border-indigo-400/15'; // Indigo
+    if (rating === 7) return 'bg-emerald-400/8 border-emerald-400/15'; // Emerald
+    if (rating === 7.5) return 'bg-green-400/10 border-green-400/18'; // Green
+    if (rating === 8) return 'bg-teal-400/8 border-teal-400/15'; // Teal
+    if (rating === 8.5) return 'bg-lime-400/8 border-lime-400/15'; // Lime
+    if (rating === 9) return 'bg-yellow-300/10 border-yellow-300/18'; // Light gold
+    if (rating === 9.5) return 'bg-yellow-200/12 border-yellow-200/20'; // Brighter gold
+    if (rating === 10) return 'bg-gradient-to-r from-yellow-200/15 to-amber-200/15 border-yellow-300/25'; // Perfect gold
+    return 'bg-gray-400/8 border-gray-400/15'; // Default
   };
 
   const getUserRatingBorderColor = (rating: number): string => {
+    // Strong left border indicators
     if (rating === 0) return 'border-l-gray-500 border-l-4'; // Unrated
-    if (rating >= 9) return 'border-l-yellow-400 border-l-4'; // 9-10 stars - Gold
-    if (rating >= 7) return 'border-l-green-400 border-l-4'; // 7-8 stars - Green
-    if (rating >= 5) return 'border-l-blue-400 border-l-4'; // 5-6 stars - Blue
-    if (rating >= 3) return 'border-l-orange-400 border-l-4'; // 3-4 stars - Orange
-    return 'border-l-red-400 border-l-4'; // 1-2 stars - Red
+    if (rating === 0.5) return 'border-l-red-600 border-l-4'; // Deep red
+    if (rating === 1) return 'border-l-red-500 border-l-4'; // Red
+    if (rating === 1.5) return 'border-l-red-400 border-l-4'; // Lighter red
+    if (rating === 2) return 'border-l-orange-600 border-l-4'; // Dark orange
+    if (rating === 2.5) return 'border-l-orange-500 border-l-4'; // Orange
+    if (rating === 3) return 'border-l-orange-400 border-l-4'; // Light orange
+    if (rating === 3.5) return 'border-l-amber-500 border-l-4'; // Amber
+    if (rating === 4) return 'border-l-yellow-600 border-l-4'; // Deep yellow
+    if (rating === 4.5) return 'border-l-yellow-500 border-l-4'; // Yellow
+    if (rating === 5) return 'border-l-cyan-500 border-l-4'; // Cyan
+    if (rating === 5.5) return 'border-l-sky-500 border-l-4'; // Sky blue
+    if (rating === 6) return 'border-l-blue-500 border-l-4'; // Blue
+    if (rating === 6.5) return 'border-l-indigo-500 border-l-4'; // Indigo
+    if (rating === 7) return 'border-l-emerald-500 border-l-4'; // Emerald
+    if (rating === 7.5) return 'border-l-green-500 border-l-4'; // Green
+    if (rating === 8) return 'border-l-teal-500 border-l-4'; // Teal
+    if (rating === 8.5) return 'border-l-lime-500 border-l-4'; // Lime
+    if (rating === 9) return 'border-l-yellow-400 border-l-4'; // Light gold
+    if (rating === 9.5) return 'border-l-yellow-300 border-l-4'; // Brighter gold
+    if (rating === 10) return 'border-l-amber-400 border-l-4'; // Perfect gold
+    return 'border-l-gray-500 border-l-4'; // Default
+  };
+
+  // Strong bubble colors for the rating indicators
+  const getUserRatingBubbleColor = (rating: number): string => {
+    if (rating === 0) return 'bg-gray-600 text-gray-200'; // Unrated
+    if (rating === 0.5) return 'bg-red-700 text-white'; // Deep red
+    if (rating === 1) return 'bg-red-600 text-white'; // Red
+    if (rating === 1.5) return 'bg-red-500 text-white'; // Lighter red
+    if (rating === 2) return 'bg-orange-700 text-white'; // Dark orange
+    if (rating === 2.5) return 'bg-orange-600 text-white'; // Orange
+    if (rating === 3) return 'bg-orange-500 text-white'; // Light orange
+    if (rating === 3.5) return 'bg-amber-600 text-white'; // Amber
+    if (rating === 4) return 'bg-yellow-700 text-white'; // Deep yellow
+    if (rating === 4.5) return 'bg-yellow-600 text-white'; // Yellow
+    if (rating === 5) return 'bg-cyan-600 text-white'; // Cyan
+    if (rating === 5.5) return 'bg-sky-600 text-white'; // Sky blue
+    if (rating === 6) return 'bg-blue-600 text-white'; // Blue
+    if (rating === 6.5) return 'bg-indigo-600 text-white'; // Indigo
+    if (rating === 7) return 'bg-emerald-600 text-white'; // Emerald
+    if (rating === 7.5) return 'bg-green-600 text-white'; // Green
+    if (rating === 8) return 'bg-teal-600 text-white'; // Teal
+    if (rating === 8.5) return 'bg-lime-600 text-black'; // Lime
+    if (rating === 9) return 'bg-yellow-500 text-black'; // Light gold
+    if (rating === 9.5) return 'bg-yellow-400 text-black'; // Brighter gold
+    if (rating === 10) return 'bg-gradient-to-r from-yellow-400 to-amber-400 text-black'; // Perfect gold
+    return 'bg-gray-600 text-gray-200'; // Default
   };
 
   const getUserRatingText = (rating: number): string => {
-    if (rating === 0) return 'Unrated';
-    return `${rating}★`;
+    if (rating === 0) return 'NR';
+    if (rating % 1 === 0) return `★${rating}`; // Whole numbers
+    return `★${rating}`; // Half-star ratings
   };
 
   // Tier system functions
@@ -2221,17 +2282,7 @@ const Home = () => {
                         }`}>
                           {(userRatingSortOrder !== 'none' || userRatingFilter !== null) && pokemon.firebaseId ? (
                             <div className={`flex items-center justify-center w-14 h-14 rounded-lg text-xs font-bold transition-all duration-300 ${
-                              getUserRating(pokemon.firebaseId) === 0 
-                                ? 'bg-gray-600 text-gray-200' 
-                                : getUserRating(pokemon.firebaseId) >= 9
-                                ? 'bg-yellow-500 text-black'
-                                : getUserRating(pokemon.firebaseId) >= 7
-                                ? 'bg-green-500 text-white'
-                                : getUserRating(pokemon.firebaseId) >= 5
-                                ? 'bg-blue-500 text-white'
-                                : getUserRating(pokemon.firebaseId) >= 3
-                                ? 'bg-orange-500 text-white'
-                                : 'bg-red-500 text-white'
+                              getUserRatingBubbleColor(getUserRating(pokemon.firebaseId))
                             }`}>
                               <span className="text-center leading-tight">
                                 {getUserRatingText(getUserRating(pokemon.firebaseId))}
@@ -3390,17 +3441,7 @@ const Home = () => {
                       }`}>
                         {(userRatingSortOrder !== 'none' || userRatingFilter !== null) && pokemon.firebaseId ? (
                           <div className={`flex items-center justify-center w-10 h-10 rounded-lg text-xs font-bold transition-all duration-300 ${
-                            getUserRating(pokemon.firebaseId) === 0 
-                              ? 'bg-gray-600 text-gray-200' 
-                              : getUserRating(pokemon.firebaseId) >= 9
-                              ? 'bg-yellow-500 text-black'
-                              : getUserRating(pokemon.firebaseId) >= 7
-                              ? 'bg-green-500 text-white'
-                              : getUserRating(pokemon.firebaseId) >= 5
-                              ? 'bg-blue-500 text-white'
-                              : getUserRating(pokemon.firebaseId) >= 3
-                              ? 'bg-orange-500 text-white'
-                              : 'bg-red-500 text-white'
+                            getUserRatingBubbleColor(getUserRating(pokemon.firebaseId))
                           }`}>
                             <span className="text-center leading-tight text-xs">
                               {getUserRating(pokemon.firebaseId) === 0 
