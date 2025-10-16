@@ -723,55 +723,55 @@ const Home = () => {
 
   // Helper functions for user rating visualization
   const getUserRatingBorderColor = (rating: number): string => {
-    // Strong left border indicators
-    if (rating === 0) return 'border-l-gray-500 border-l-4'; // Unrated
-    if (rating === 0.5) return 'border-l-red-600 border-l-4'; // Deep red
-    if (rating === 1) return 'border-l-red-500 border-l-4'; // Red
-    if (rating === 1.5) return 'border-l-red-400 border-l-4'; // Lighter red
-    if (rating === 2) return 'border-l-orange-600 border-l-4'; // Dark orange
-    if (rating === 2.5) return 'border-l-orange-500 border-l-4'; // Orange
-    if (rating === 3) return 'border-l-orange-400 border-l-4'; // Light orange
-    if (rating === 3.5) return 'border-l-amber-500 border-l-4'; // Amber
-    if (rating === 4) return 'border-l-yellow-600 border-l-4'; // Deep yellow
-    if (rating === 4.5) return 'border-l-yellow-500 border-l-4'; // Yellow
-    if (rating === 5) return 'border-l-cyan-500 border-l-4'; // Cyan
-    if (rating === 5.5) return 'border-l-sky-500 border-l-4'; // Sky blue
-    if (rating === 6) return 'border-l-blue-500 border-l-4'; // Blue
-    if (rating === 6.5) return 'border-l-indigo-500 border-l-4'; // Indigo
-    if (rating === 7) return 'border-l-emerald-500 border-l-4'; // Emerald
-    if (rating === 7.5) return 'border-l-green-500 border-l-4'; // Green
-    if (rating === 8) return 'border-l-teal-500 border-l-4'; // Teal
-    if (rating === 8.5) return 'border-l-lime-500 border-l-4'; // Lime
-    if (rating === 9) return 'border-l-yellow-400 border-l-4'; // Light gold
-    if (rating === 9.5) return 'border-l-yellow-300 border-l-4'; // Brighter gold
-    if (rating === 10) return 'border-l-amber-400 border-l-4'; // Perfect gold
-    return 'border-l-gray-500 border-l-4'; // Default
+    // Strong left border indicators - 21 distinct colors flowing from trashy red to golden cool
+    if (rating === 0) return 'border-l-gray-600 border-l-4'; // Unrated - Gray
+    if (rating === 0.5) return 'border-l-red-800 border-l-4'; // Deep dark red - Trash tier
+    if (rating === 1) return 'border-l-red-600 border-l-4'; // Dark red
+    if (rating === 1.5) return 'border-l-red-500 border-l-4'; // Red
+    if (rating === 2) return 'border-l-orange-700 border-l-4'; // Dark orange
+    if (rating === 2.5) return 'border-l-orange-600 border-l-4'; // Orange
+    if (rating === 3) return 'border-l-orange-500 border-l-4'; // Bright orange
+    if (rating === 3.5) return 'border-l-amber-600 border-l-4'; // Dark amber
+    if (rating === 4) return 'border-l-amber-500 border-l-4'; // Amber
+    if (rating === 4.5) return 'border-l-yellow-600 border-l-4'; // Dark yellow
+    if (rating === 5) return 'border-l-yellow-500 border-l-4'; // Yellow
+    if (rating === 5.5) return 'border-l-lime-600 border-l-4'; // Dark lime
+    if (rating === 6) return 'border-l-lime-500 border-l-4'; // Lime
+    if (rating === 6.5) return 'border-l-green-600 border-l-4'; // Dark green
+    if (rating === 7) return 'border-l-green-500 border-l-4'; // Green
+    if (rating === 7.5) return 'border-l-emerald-600 border-l-4'; // Dark emerald
+    if (rating === 8) return 'border-l-emerald-500 border-l-4'; // Emerald
+    if (rating === 8.5) return 'border-l-teal-600 border-l-4'; // Dark teal
+    if (rating === 9) return 'border-l-cyan-500 border-l-4'; // Cyan - Cool blue
+    if (rating === 9.5) return 'border-l-blue-500 border-l-4'; // Blue - Premium
+    if (rating === 10) return 'border-l-yellow-400 border-l-4'; // Golden yellow - Perfect
+    return 'border-l-gray-600 border-l-4'; // Default
   };
 
-  // Strong bubble colors for the rating indicators
+  // Strong bubble colors for the rating indicators - 21 distinct colors
   const getUserRatingBubbleColor = (rating: number): string => {
-    if (rating === 0) return 'bg-gray-600 text-gray-200'; // Unrated
-    if (rating === 0.5) return 'bg-red-700 text-white'; // Deep red
-    if (rating === 1) return 'bg-red-600 text-white'; // Red
-    if (rating === 1.5) return 'bg-red-500 text-white'; // Lighter red
-    if (rating === 2) return 'bg-orange-700 text-white'; // Dark orange
-    if (rating === 2.5) return 'bg-orange-600 text-white'; // Orange
-    if (rating === 3) return 'bg-orange-500 text-white'; // Light orange
-    if (rating === 3.5) return 'bg-amber-600 text-white'; // Amber
-    if (rating === 4) return 'bg-yellow-700 text-white'; // Deep yellow
-    if (rating === 4.5) return 'bg-yellow-600 text-white'; // Yellow
-    if (rating === 5) return 'bg-cyan-600 text-white'; // Cyan
-    if (rating === 5.5) return 'bg-sky-600 text-white'; // Sky blue
-    if (rating === 6) return 'bg-blue-600 text-white'; // Blue
-    if (rating === 6.5) return 'bg-indigo-600 text-white'; // Indigo
-    if (rating === 7) return 'bg-emerald-600 text-white'; // Emerald
-    if (rating === 7.5) return 'bg-green-600 text-white'; // Green
-    if (rating === 8) return 'bg-teal-600 text-white'; // Teal
-    if (rating === 8.5) return 'bg-lime-600 text-black'; // Lime
-    if (rating === 9) return 'bg-yellow-500 text-black'; // Light gold
-    if (rating === 9.5) return 'bg-yellow-400 text-black'; // Brighter gold
-    if (rating === 10) return 'bg-gradient-to-r from-yellow-400 to-amber-400 text-black'; // Perfect gold
-    return 'bg-gray-600 text-gray-200'; // Default
+    if (rating === 0) return 'bg-gray-700 text-gray-200'; // Unrated - Gray
+    if (rating === 0.5) return 'bg-red-900 text-white'; // Deep dark red - Trash tier
+    if (rating === 1) return 'bg-red-700 text-white'; // Dark red
+    if (rating === 1.5) return 'bg-red-600 text-white'; // Red
+    if (rating === 2) return 'bg-orange-800 text-white'; // Dark orange
+    if (rating === 2.5) return 'bg-orange-700 text-white'; // Orange
+    if (rating === 3) return 'bg-orange-600 text-white'; // Bright orange
+    if (rating === 3.5) return 'bg-amber-700 text-white'; // Dark amber
+    if (rating === 4) return 'bg-amber-600 text-white'; // Amber
+    if (rating === 4.5) return 'bg-yellow-700 text-white'; // Dark yellow
+    if (rating === 5) return 'bg-yellow-600 text-white'; // Yellow
+    if (rating === 5.5) return 'bg-lime-700 text-white'; // Dark lime
+    if (rating === 6) return 'bg-lime-600 text-black'; // Lime
+    if (rating === 6.5) return 'bg-green-700 text-white'; // Dark green
+    if (rating === 7) return 'bg-green-600 text-white'; // Green
+    if (rating === 7.5) return 'bg-emerald-700 text-white'; // Dark emerald
+    if (rating === 8) return 'bg-emerald-600 text-white'; // Emerald
+    if (rating === 8.5) return 'bg-teal-700 text-white'; // Dark teal
+    if (rating === 9) return 'bg-cyan-600 text-white'; // Cyan - Cool blue
+    if (rating === 9.5) return 'bg-blue-600 text-white'; // Blue - Premium
+    if (rating === 10) return 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-black'; // Golden - Perfect
+    return 'bg-gray-700 text-gray-200'; // Default
   };
 
   const getUserRatingText = (rating: number): string => {
