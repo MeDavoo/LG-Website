@@ -722,32 +722,6 @@ const Home = () => {
   };
 
   // Helper functions for user rating visualization
-  const getUserRatingColor = (rating: number): string => {
-    // Gentle background colors for list items - very subtle and flowing
-    if (rating === 0) return 'bg-gray-400/8 border-gray-400/15'; // Unrated
-    if (rating === 0.5) return 'bg-red-400/8 border-red-400/15'; // Deep red tint
-    if (rating === 1) return 'bg-red-400/10 border-red-400/18'; // Red
-    if (rating === 1.5) return 'bg-red-300/10 border-red-300/18'; // Lighter red
-    if (rating === 2) return 'bg-orange-500/8 border-orange-500/15'; // Dark orange
-    if (rating === 2.5) return 'bg-orange-400/8 border-orange-400/15'; // Orange
-    if (rating === 3) return 'bg-orange-300/10 border-orange-300/18'; // Light orange
-    if (rating === 3.5) return 'bg-amber-400/8 border-amber-400/15'; // Amber
-    if (rating === 4) return 'bg-yellow-500/8 border-yellow-500/15'; // Deep yellow
-    if (rating === 4.5) return 'bg-yellow-400/8 border-yellow-400/15'; // Yellow
-    if (rating === 5) return 'bg-cyan-400/8 border-cyan-400/15'; // Cyan
-    if (rating === 5.5) return 'bg-sky-400/8 border-sky-400/15'; // Sky blue
-    if (rating === 6) return 'bg-blue-400/10 border-blue-400/18'; // Blue
-    if (rating === 6.5) return 'bg-indigo-400/8 border-indigo-400/15'; // Indigo
-    if (rating === 7) return 'bg-emerald-400/8 border-emerald-400/15'; // Emerald
-    if (rating === 7.5) return 'bg-green-400/10 border-green-400/18'; // Green
-    if (rating === 8) return 'bg-teal-400/8 border-teal-400/15'; // Teal
-    if (rating === 8.5) return 'bg-lime-400/8 border-lime-400/15'; // Lime
-    if (rating === 9) return 'bg-yellow-300/10 border-yellow-300/18'; // Light gold
-    if (rating === 9.5) return 'bg-yellow-200/12 border-yellow-200/20'; // Brighter gold
-    if (rating === 10) return 'bg-gradient-to-r from-yellow-200/15 to-amber-200/15 border-yellow-300/25'; // Perfect gold
-    return 'bg-gray-400/8 border-gray-400/15'; // Default
-  };
-
   const getUserRatingBorderColor = (rating: number): string => {
     // Strong left border indicators
     if (rating === 0) return 'border-l-gray-500 border-l-4'; // Unrated
