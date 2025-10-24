@@ -1837,9 +1837,9 @@ const Home = () => {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft' || e.key === '1') {
+      if (e.key === 'ArrowLeft') {
         navigatePrevious();
-      } else if (e.key === 'ArrowRight' || e.key === '2') {
+      } else if (e.key === 'ArrowRight') {
         navigateNext();
       }
     };
