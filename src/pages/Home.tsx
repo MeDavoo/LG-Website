@@ -44,6 +44,7 @@ const Home = () => {
   // Load Pokemon data from Firebase
   useEffect(() => {
     loadPokemonData();
+    loadPokemonChanges();
   }, []);
 
   // Animation speed control system
@@ -640,6 +641,19 @@ const Home = () => {
   const [isEvolutionEditMode, setIsEvolutionEditMode] = useState(false);
   const [evolutionMethods, setEvolutionMethods] = useState<{[pokemonId: string]: string}>({});
 
+  // Change Tracking System state - Firebase-based
+  const [pokemonChanges, setPokemonChanges] = useState<{[pokemonId: string]: {
+    pokemonName: string;
+    pokedexNumber: number;
+    latestChange: {
+      type: 'stats' | 'ability' | 'hiddenAbility' | 'evolutionMethod';
+      oldValue: string;
+      newValue: string;
+      timestamp: Date;
+      changedBy: string; // Device ID or user identifier
+    };
+  }}>({});
+
   // Auto-select first Pokemon with artwork when data loads
   useEffect(() => {
     if (pokemonSlots.length > 0 && !selectedPokemon) {
@@ -842,9 +856,48 @@ const Home = () => {
       hiddenAbility
     });
     
+    // Get current values for change tracking
+    const currentStats = pokemonStats?.stats;
+    const currentAbility = pokemonStats?.ability || '';
+    const currentHiddenAbility = pokemonStats?.hiddenAbility || '';
+    
     try {
       // Call the updated service with string parameters
       await updatePokemonStats(selectedPokemon.firebaseId, stats, ability, hiddenAbility);
+      
+      // Track changes
+      if (currentStats) {
+        const statsChanged = JSON.stringify(currentStats) !== JSON.stringify(stats);
+        if (statsChanged) {
+          trackPokemonChange(
+            selectedPokemon.firebaseId,
+            selectedPokemon.name,
+            'stats',
+            `HP:${currentStats.hp} ATK:${currentStats.attack} DEF:${currentStats.defense} SPATK:${currentStats.spAttack} SPDEF:${currentStats.spDefense} SPD:${currentStats.speed}`,
+            `HP:${stats.hp} ATK:${stats.attack} DEF:${stats.defense} SPATK:${stats.spAttack} SPDEF:${stats.spDefense} SPD:${stats.speed}`
+          );
+        }
+      }
+      
+      if (currentAbility !== ability) {
+        trackPokemonChange(
+          selectedPokemon.firebaseId,
+          selectedPokemon.name,
+          'ability',
+          currentAbility,
+          ability
+        );
+      }
+      
+      if (currentHiddenAbility !== (hiddenAbility || '')) {
+        trackPokemonChange(
+          selectedPokemon.firebaseId,
+          selectedPokemon.name,
+          'hiddenAbility',
+          currentHiddenAbility,
+          hiddenAbility || ''
+        );
+      }
       
       // Update local state with the new format
       setPokemonStats({ stats, ability, hiddenAbility });
@@ -873,15 +926,181 @@ const Home = () => {
     }
   }, [selectedPokemon?.firebaseId, showStats, isStatsEditorMode]);
 
+  // Change Tracking Functions - Firebase-based
+  const trackPokemonChange = async (pokemonId: string, pokemonName: string, type: 'stats' | 'ability' | 'hiddenAbility' | 'evolutionMethod', oldValue: string, newValue: string) => {
+    try {
+      // Get device ID for tracking who made the change
+      const deviceId = getDeviceId();
+      
+      // Find Pokemon to get Pokedex number
+      const pokemon = pokemonSlots.find(p => p.firebaseId === pokemonId);
+      const pokedexNumber = pokemon?.id || 0;
+      
+      const changeData = {
+        pokemonName,
+        pokedexNumber,
+        latestChange: {
+          type,
+          oldValue,
+          newValue,
+          timestamp: new Date(),
+          changedBy: deviceId
+        }
+      };
+
+      // Save to Firebase changes collection
+      const { doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('../config/firebase');
+      
+      await setDoc(doc(db, 'pokemonChanges', pokemonId), changeData);
+      
+      // Update local state
+      setPokemonChanges(prev => ({
+        ...prev,
+        [pokemonId]: changeData
+      }));
+      
+      console.log(`📝 Tracked change for ${pokemonName}: ${type}`);
+    } catch (error) {
+      console.error('Error tracking Pokemon change:', error);
+    }
+  };
+
+  const loadPokemonChanges = async () => {
+    try {
+      const { collection, getDocs } = await import('firebase/firestore');
+      const { db } = await import('../config/firebase');
+      
+      const changesCollection = collection(db, 'pokemonChanges');
+      const snapshot = await getDocs(changesCollection);
+      
+      const changes: typeof pokemonChanges = {};
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        // Convert timestamp back to Date object
+        if (data.latestChange && data.latestChange.timestamp) {
+          data.latestChange.timestamp = data.latestChange.timestamp.toDate();
+        }
+        changes[doc.id] = data as {
+          pokemonName: string;
+          pokedexNumber: number;
+          latestChange: {
+            type: 'stats' | 'ability' | 'hiddenAbility' | 'evolutionMethod';
+            oldValue: string;
+            newValue: string;
+            timestamp: Date;
+            changedBy: string;
+          };
+        };
+      });
+      
+      setPokemonChanges(changes);
+      console.log(`📋 Loaded ${Object.keys(changes).length} Pokemon changes from Firebase`);
+    } catch (error) {
+      console.error('Error loading Pokemon changes:', error);
+    }
+  };
+
+  const clearChangeTracking = async () => {
+    try {
+      const { collection, getDocs, deleteDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('../config/firebase');
+      
+      // Delete all documents in pokemonChanges collection
+      const changesCollection = collection(db, 'pokemonChanges');
+      const snapshot = await getDocs(changesCollection);
+      
+      const deletePromises = snapshot.docs.map(docSnapshot => 
+        deleteDoc(doc(db, 'pokemonChanges', docSnapshot.id))
+      );
+      
+      await Promise.all(deletePromises);
+      
+      // Clear local state
+      setPokemonChanges({});
+      showNotification('Change tracking cleared successfully!', 'success');
+    } catch (error) {
+      console.error('Error clearing change tracking:', error);
+      showNotification('Failed to clear change tracking', 'error');
+    }
+  };
+
+  const exportPokemonChanges = () => {
+    const changeEntries = Object.entries(pokemonChanges);
+    
+    if (changeEntries.length === 0) {
+      showNotification('No Pokemon changes to export!', 'info');
+      return;
+    }
+
+    // Sort by Pokedex number
+    const sortedEntries = changeEntries.sort(([, aData], [, bData]) => {
+      return aData.pokedexNumber - bData.pokedexNumber;
+    });
+
+    let textContent = 'Pokemon Changes Export (Latest Changes Only)\n';
+    textContent += '==========================================\n\n';
+    textContent += `Total Pokemon Modified: ${sortedEntries.length}\n`;
+    textContent += `Export Date: ${new Date().toLocaleString()}\n\n`;
+    textContent += `Note: Shows only the most recent change for each Pokemon.\n`;
+    textContent += `Changes are tracked across all devices and users.\n\n`;
+
+    sortedEntries.forEach(([pokemonId, data]) => {
+      const change = data.latestChange;
+      
+      textContent += `📋 #${data.pokedexNumber} ${data.pokemonName}\n`;
+      textContent += '─'.repeat(50) + '\n';
+      textContent += `Latest Change: ${change.type.toUpperCase()}\n`;
+      textContent += `Old Value: "${change.oldValue}"\n`;
+      textContent += `New Value: "${change.newValue}"\n`;
+      textContent += `Changed By: ${change.changedBy}\n`;
+      textContent += `Timestamp: ${change.timestamp.toLocaleString()}\n`;
+      textContent += `Firebase ID: ${pokemonId}\n\n`;
+    });
+
+    // Create and download the file
+    const blob = new Blob([textContent], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pokemon_changes_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    showNotification(`✅ Exported ${sortedEntries.length} Pokemon changes!`, 'success');
+  };
+
   // Evolution Methods functions
   const toggleEvolutionEditMode = () => {
     setIsEvolutionEditMode(!isEvolutionEditMode);
   };
 
   const handleSaveEvolutionMethod = async (pokemonId: string, method: string) => {
+    // Get current evolution method for change tracking
+    const currentMethod = evolutionMethods[pokemonId] || '';
+    const newMethod = method.trim();
+    
+    // Find Pokemon name for tracking
+    const pokemon = pokemonSlots.find(p => p.firebaseId === pokemonId);
+    const pokemonName = pokemon?.name || 'Unknown Pokemon';
+    
     try {
-      await updatePokemon(pokemonId, { evolutionMethod: method.trim() || undefined });
-      setEvolutionMethods(prev => ({ ...prev, [pokemonId]: method.trim() }));
+      await updatePokemon(pokemonId, { evolutionMethod: newMethod || undefined });
+      setEvolutionMethods(prev => ({ ...prev, [pokemonId]: newMethod }));
+      
+      // Track change if method actually changed
+      if (currentMethod !== newMethod) {
+        trackPokemonChange(
+          pokemonId,
+          pokemonName,
+          'evolutionMethod',
+          currentMethod,
+          newMethod
+        );
+      }
+      
       showNotification('Evolution method saved successfully!', 'success');
     } catch (error) {
       console.error('Error saving evolution method:', error);
@@ -2446,6 +2665,29 @@ const Home = () => {
                       >
                         📄
                       </button>
+                      {/* Admin-only Export Changes Button */}
+                      <button
+                        onClick={exportPokemonChanges}
+                        className="px-2 py-1 rounded-lg font-semibold transition-all text-sm bg-orange-500 text-white hover:bg-orange-600 relative"
+                        title="Export Pokemon Changes Log"
+                      >
+                        🔄
+                        {Object.keys(pokemonChanges).length > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                            {Object.keys(pokemonChanges).length}
+                          </span>
+                        )}
+                      </button>
+                      {/* Clear Changes Button - only show if there are changes */}
+                      {Object.keys(pokemonChanges).length > 0 && (
+                        <button
+                          onClick={clearChangeTracking}
+                          className="px-2 py-1 rounded-lg font-semibold transition-all text-sm bg-red-500 text-white hover:bg-red-600"
+                          title="Clear Change Tracking History"
+                        >
+                          🗑️
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -3542,22 +3784,22 @@ const Home = () => {
                                         />
                                       </svg>
                                       
-                                      {/* Evolution Method Editor for the next stage's first Pokemon */}
-                                      {stageGroups[sortedStages[stageIndex + 1]]?.[0]?.firebaseId && (
+                                      {/* Evolution Method Editor - show method from CURRENT stage Pokemon (the one that evolves) */}
+                                      {stageGroups[sortedStages[stageIndex]]?.[0]?.firebaseId && (
                                         <>
                                           {/* Debug info - remove after testing */}
                                           {console.log('🔍 Evolution Debug:', {
                                             currentStage: sortedStages[stageIndex],
                                             nextStage: sortedStages[stageIndex + 1],
                                             currentStagePokemon: stageGroups[sortedStages[stageIndex]].map(p => `${p.name} (${p.firebaseId})`),
-                                            nextStagePokemon: stageGroups[sortedStages[stageIndex + 1]].map(p => `${p.name} (${p.firebaseId})`),
-                                            targetPokemonId: stageGroups[sortedStages[stageIndex + 1]][0].firebaseId,
-                                            evolutionMethod: evolutionMethods[stageGroups[sortedStages[stageIndex + 1]][0].firebaseId!]
+                                            nextStagePokemon: stageGroups[sortedStages[stageIndex + 1]]?.map(p => `${p.name} (${p.firebaseId})`) || [],
+                                            sourcePokemonId: stageGroups[sortedStages[stageIndex]][0].firebaseId,
+                                            evolutionMethod: evolutionMethods[stageGroups[sortedStages[stageIndex]][0].firebaseId!]
                                           })}
                                           <EvolutionEditor
-                                            pokemonId={stageGroups[sortedStages[stageIndex + 1]][0].firebaseId!}
-                                            pokemonName={stageGroups[sortedStages[stageIndex + 1]][0].name}
-                                            initialMethod={evolutionMethods[stageGroups[sortedStages[stageIndex + 1]][0].firebaseId!] || ''}
+                                            pokemonId={stageGroups[sortedStages[stageIndex]][0].firebaseId!}
+                                            pokemonName={stageGroups[sortedStages[stageIndex]][0].name}
+                                            initialMethod={evolutionMethods[stageGroups[sortedStages[stageIndex]][0].firebaseId!] || ''}
                                             isEditMode={isEvolutionEditMode}
                                             onSave={handleSaveEvolutionMethod}
                                           />

@@ -100,19 +100,35 @@ async function getFirebasePokemon() {
     const pokemonCollection = collection(db, 'pokemon');
     const snapshot = await getDocs(pokemonCollection);
     
+    // Build maps for flexible lookup: by display name, by uppercased display name, and by internalName (uppercased)
     const firebasePokemon = {};
+    const firebaseByDisplayUpper = {};
+    const firebaseByInternal = {};
+
     snapshot.forEach(doc => {
       const data = doc.data();
-      if (data.name) {
+      if (data && data.name) {
         firebasePokemon[data.name] = {
           id: doc.id,
           ...data
         };
+        // Uppercase display name map
+        firebaseByDisplayUpper[data.name.toUpperCase()] = {
+          id: doc.id,
+          ...data
+        };
+        // If internalName exists, add to internal map (uppercase)
+        if (data.internalName) {
+          firebaseByInternal[data.internalName.toUpperCase()] = {
+            id: doc.id,
+            ...data
+          };
+        }
       }
     });
     
     console.log(`✅ Found ${Object.keys(firebasePokemon).length} Pokemon in Firebase`);
-    return firebasePokemon;
+    return { firebasePokemon, firebaseByDisplayUpper, firebaseByInternal };
   } catch (error) {
     console.error('❌ Error fetching from Firebase:', error);
     return {};
@@ -128,7 +144,7 @@ async function fixEvolutionMethods() {
     const correctEvolutionMethods = parseEvolutionData();
     
     // Get Firebase Pokemon
-    const firebasePokemon = await getFirebasePokemon();
+  const { firebasePokemon, firebaseByDisplayUpper, firebaseByInternal } = await getFirebasePokemon();
     
     console.log('\\n🧹 Step 1: Clearing all existing evolution methods...');
     
@@ -160,23 +176,39 @@ async function fixEvolutionMethods() {
     let updatedCount = 0;
     let notFoundCount = 0;
     
-    for (const [targetPokemonName, evolutionMethod] of Object.entries(correctEvolutionMethods)) {
-      if (firebasePokemon[targetPokemonName]) {
+    for (const [targetPokemonNameRaw, evolutionMethod] of Object.entries(correctEvolutionMethods)) {
+      // Target name in the file may be an internal name (UPPERCASE). Try internalName map first.
+      const targetKeyUpper = targetPokemonNameRaw.toUpperCase();
+      let found = null;
+
+      if (firebaseByInternal && firebaseByInternal[targetKeyUpper]) {
+        found = firebaseByInternal[targetKeyUpper];
+      } else if (firebaseByDisplayUpper && firebaseByDisplayUpper[targetKeyUpper]) {
+        found = firebaseByDisplayUpper[targetKeyUpper];
+      } else if (firebasePokemon[targetPokemonNameRaw]) {
+        found = firebasePokemon[targetPokemonNameRaw];
+      } else {
+        // Try a best-effort case-insensitive match on display names
+        const candidate = Object.keys(firebasePokemon).find(n => n.toUpperCase() === targetKeyUpper);
+        if (candidate) found = firebasePokemon[candidate];
+      }
+
+      if (found && found.id) {
         try {
-          const docRef = doc(db, 'pokemon', firebasePokemon[targetPokemonName].id);
+          const docRef = doc(db, 'pokemon', found.id);
           await updateDoc(docRef, {
             evolutionMethod: evolutionMethod
           });
-          console.log(`✅ Set evolution method for ${targetPokemonName}: "${evolutionMethod}"`);
+          console.log(`✅ Set evolution method for ${found.name || targetPokemonNameRaw}: "${evolutionMethod}" (doc ${found.id})`);
           updatedCount++;
           
           // Small delay to avoid rate limiting
           await new Promise(resolve => setTimeout(resolve, 100));
         } catch (error) {
-          console.error(`❌ Failed to update ${targetPokemonName}:`, error);
+          console.error(`❌ Failed to update ${targetPokemonNameRaw}:`, error);
         }
       } else {
-        console.log(`⚠️  Target Pokemon ${targetPokemonName} not found in Firebase`);
+        console.log(`⚠️  Target Pokemon ${targetPokemonNameRaw} not found in Firebase (tried internal and display names)`);
         notFoundCount++;
       }
     }
@@ -196,17 +228,32 @@ async function previewEvolutionFix() {
   try {
     console.log('👀 Preview mode - showing what will be changed...');
     
-    const correctEvolutionMethods = parseEvolutionData();
-    const firebasePokemon = await getFirebasePokemon();
+  const correctEvolutionMethods = parseEvolutionData();
+  const { firebasePokemon, firebaseByDisplayUpper, firebaseByInternal } = await getFirebasePokemon();
     
     console.log('\\n📋 Pokemon that will have evolution methods SET:');
     console.log('================================================');
     
     let setCount = 0;
-    for (const [targetPokemonName, evolutionMethod] of Object.entries(correctEvolutionMethods)) {
-      if (firebasePokemon[targetPokemonName]) {
-        console.log(`🔸 ${targetPokemonName}: "${evolutionMethod}"`);
+    for (const [targetPokemonNameRaw, evolutionMethod] of Object.entries(correctEvolutionMethods)) {
+      const targetKeyUpper = targetPokemonNameRaw.toUpperCase();
+      let found = null;
+      if (firebaseByInternal && firebaseByInternal[targetKeyUpper]) {
+        found = firebaseByInternal[targetKeyUpper];
+      } else if (firebaseByDisplayUpper && firebaseByDisplayUpper[targetKeyUpper]) {
+        found = firebaseByDisplayUpper[targetKeyUpper];
+      } else if (firebasePokemon[targetPokemonNameRaw]) {
+        found = firebasePokemon[targetPokemonNameRaw];
+      } else {
+        const candidate = Object.keys(firebasePokemon).find(n => n.toUpperCase() === targetKeyUpper);
+        if (candidate) found = firebasePokemon[candidate];
+      }
+
+      if (found) {
+        console.log(`🔸 ${found.name || targetPokemonNameRaw}: "${evolutionMethod}" (will set on doc ${found.id})`);
         setCount++;
+      } else {
+        console.log(`⚠️  ${targetPokemonNameRaw}: "${evolutionMethod}"  -> NOT FOUND in Firebase`);
       }
     }
     
@@ -215,16 +262,17 @@ async function previewEvolutionFix() {
     
     let clearCount = 0;
     for (const [pokemonName, pokemonData] of Object.entries(firebasePokemon)) {
-      if (pokemonData.evolutionMethod && !correctEvolutionMethods[pokemonName]) {
-        console.log(`🧹 ${pokemonName}: "${pokemonData.evolutionMethod}" -> (cleared)`);
+      if (pokemonData.evolutionMethod && !Object.values(correctEvolutionMethods).includes(pokemonData.evolutionMethod)) {
+        // Clearing is safe if the current evolutionMethod value is not present in the new methods set
+        console.log(`🧹 ${pokemonName}: "${pokemonData.evolutionMethod}" -> (will be cleared)`);
         clearCount++;
       }
     }
     
     console.log(`\\n📊 Summary:`);
-    console.log(`   Will set evolution methods: ${setCount} Pokemon`);
-    console.log(`   Will clear old methods: ${clearCount} Pokemon`);
-    console.log(`   Not found in Firebase: ${Object.keys(correctEvolutionMethods).filter(name => !firebasePokemon[name]).length} Pokemon`);
+  console.log(`   Will set evolution methods: ${setCount} Pokemon`);
+  console.log(`   Will clear old methods: ${clearCount} Pokemon`);
+  console.log(`   Not found in Firebase: ${Object.keys(correctEvolutionMethods).length - setCount} Pokemon`);
     
   } catch (error) {
     console.error('💥 Preview error:', error);
