@@ -1004,14 +1004,39 @@ const Home = () => {
       const changes: typeof pokemonChanges = {};
       snapshot.forEach(doc => {
         const data = doc.data();
-        // Convert timestamps back to Date objects
-        if (data.changes) {
+        
+        // Handle both old and new data structures
+        // Old structure: { latestChange: {...} }
+        // New structure: { changes: { stats: {...}, ability: {...}, etc } }
+        
+        if (data.latestChange && !data.changes) {
+          // Convert old structure to new structure
+          const changeType = data.latestChange.type || 'stats';
+          data.changes = {
+            [changeType]: {
+              oldValue: data.latestChange.oldValue,
+              newValue: data.latestChange.newValue,
+              timestamp: data.latestChange.timestamp,
+              changedBy: data.latestChange.changedBy
+            }
+          };
+          delete data.latestChange; // Remove old structure
+        }
+        
+        // Convert timestamps back to Date objects for new structure
+        if (data.changes && typeof data.changes === 'object') {
           Object.keys(data.changes).forEach(changeType => {
             if (data.changes[changeType] && data.changes[changeType].timestamp) {
               data.changes[changeType].timestamp = data.changes[changeType].timestamp.toDate();
             }
           });
         }
+        
+        // Ensure data has the required structure
+        if (!data.changes) {
+          data.changes = {};
+        }
+        
         changes[doc.id] = data as {
           pokemonName: string;
           pokedexNumber: number;
@@ -1096,7 +1121,8 @@ const Home = () => {
     textContent += `Changes are tracked across all devices and users.\n\n`;
 
     sortedEntries.forEach(([pokemonId, data]) => {
-      const changes = data.changes;
+      // Safety check for changes object - handle both old and new data structures
+      const changes = data.changes || {};
       const changeTypes = Object.keys(changes);
       
       if (changeTypes.length === 0) return;
@@ -1107,16 +1133,14 @@ const Home = () => {
       // Show all change types for this Pokemon
       changeTypes.forEach(changeType => {
         const change = changes[changeType as keyof typeof changes];
-        if (change) {
+        if (change && change.oldValue !== undefined && change.newValue !== undefined) {
           textContent += `\n${changeType.toUpperCase()} Change:\n`;
           textContent += `  Old Value: "${change.oldValue}"\n`;
           textContent += `  New Value: "${change.newValue}"\n`;
-          textContent += `  Changed By: ${change.changedBy}\n`;
-          textContent += `  Timestamp: ${change.timestamp.toLocaleString()}\n`;
         }
       });
       
-      textContent += `\nFirebase ID: ${pokemonId}\n\n`;
+      textContent += `\n`;
     });
 
     // Create and download the file
