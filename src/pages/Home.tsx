@@ -645,12 +645,31 @@ const Home = () => {
   const [pokemonChanges, setPokemonChanges] = useState<{[pokemonId: string]: {
     pokemonName: string;
     pokedexNumber: number;
-    latestChange: {
-      type: 'stats' | 'ability' | 'hiddenAbility' | 'evolutionMethod';
-      oldValue: string;
-      newValue: string;
-      timestamp: Date;
-      changedBy: string; // Device ID or user identifier
+    changes: {
+      stats?: {
+        oldValue: string;
+        newValue: string;
+        timestamp: Date;
+        changedBy: string;
+      };
+      ability?: {
+        oldValue: string;
+        newValue: string;
+        timestamp: Date;
+        changedBy: string;
+      };
+      hiddenAbility?: {
+        oldValue: string;
+        newValue: string;
+        timestamp: Date;
+        changedBy: string;
+      };
+      evolutionMethod?: {
+        oldValue: string;
+        newValue: string;
+        timestamp: Date;
+        changedBy: string;
+      };
     };
   }}>({});
 
@@ -936,15 +955,23 @@ const Home = () => {
       const pokemon = pokemonSlots.find(p => p.firebaseId === pokemonId);
       const pokedexNumber = pokemon?.id || 0;
       
-      const changeData = {
+      // Get existing data or create new
+      const existingData = pokemonChanges[pokemonId] || {
         pokemonName,
         pokedexNumber,
-        latestChange: {
-          type,
-          oldValue,
-          newValue,
-          timestamp: new Date(),
-          changedBy: deviceId
+        changes: {}
+      };
+      
+      const changeData = {
+        ...existingData,
+        changes: {
+          ...existingData.changes,
+          [type]: {
+            oldValue,
+            newValue,
+            timestamp: new Date(),
+            changedBy: deviceId
+          }
         }
       };
 
@@ -960,7 +987,7 @@ const Home = () => {
         [pokemonId]: changeData
       }));
       
-      console.log(`📝 Tracked change for ${pokemonName}: ${type}`);
+      console.log(`📝 Tracked ${type} change for ${pokemonName}`);
     } catch (error) {
       console.error('Error tracking Pokemon change:', error);
     }
@@ -977,19 +1004,42 @@ const Home = () => {
       const changes: typeof pokemonChanges = {};
       snapshot.forEach(doc => {
         const data = doc.data();
-        // Convert timestamp back to Date object
-        if (data.latestChange && data.latestChange.timestamp) {
-          data.latestChange.timestamp = data.latestChange.timestamp.toDate();
+        // Convert timestamps back to Date objects
+        if (data.changes) {
+          Object.keys(data.changes).forEach(changeType => {
+            if (data.changes[changeType] && data.changes[changeType].timestamp) {
+              data.changes[changeType].timestamp = data.changes[changeType].timestamp.toDate();
+            }
+          });
         }
         changes[doc.id] = data as {
           pokemonName: string;
           pokedexNumber: number;
-          latestChange: {
-            type: 'stats' | 'ability' | 'hiddenAbility' | 'evolutionMethod';
-            oldValue: string;
-            newValue: string;
-            timestamp: Date;
-            changedBy: string;
+          changes: {
+            stats?: {
+              oldValue: string;
+              newValue: string;
+              timestamp: Date;
+              changedBy: string;
+            };
+            ability?: {
+              oldValue: string;
+              newValue: string;
+              timestamp: Date;
+              changedBy: string;
+            };
+            hiddenAbility?: {
+              oldValue: string;
+              newValue: string;
+              timestamp: Date;
+              changedBy: string;
+            };
+            evolutionMethod?: {
+              oldValue: string;
+              newValue: string;
+              timestamp: Date;
+              changedBy: string;
+            };
           };
         };
       });
@@ -1038,24 +1088,35 @@ const Home = () => {
       return aData.pokedexNumber - bData.pokedexNumber;
     });
 
-    let textContent = 'Pokemon Changes Export (Latest Changes Only)\n';
-    textContent += '==========================================\n\n';
+    let textContent = 'Pokemon Changes Export (All Change Types)\n';
+    textContent += '=========================================\n\n';
     textContent += `Total Pokemon Modified: ${sortedEntries.length}\n`;
     textContent += `Export Date: ${new Date().toLocaleString()}\n\n`;
-    textContent += `Note: Shows only the most recent change for each Pokemon.\n`;
+    textContent += `Note: Shows all types of changes for each Pokemon.\n`;
     textContent += `Changes are tracked across all devices and users.\n\n`;
 
     sortedEntries.forEach(([pokemonId, data]) => {
-      const change = data.latestChange;
+      const changes = data.changes;
+      const changeTypes = Object.keys(changes);
+      
+      if (changeTypes.length === 0) return;
       
       textContent += `📋 #${data.pokedexNumber} ${data.pokemonName}\n`;
       textContent += '─'.repeat(50) + '\n';
-      textContent += `Latest Change: ${change.type.toUpperCase()}\n`;
-      textContent += `Old Value: "${change.oldValue}"\n`;
-      textContent += `New Value: "${change.newValue}"\n`;
-      textContent += `Changed By: ${change.changedBy}\n`;
-      textContent += `Timestamp: ${change.timestamp.toLocaleString()}\n`;
-      textContent += `Firebase ID: ${pokemonId}\n\n`;
+      
+      // Show all change types for this Pokemon
+      changeTypes.forEach(changeType => {
+        const change = changes[changeType as keyof typeof changes];
+        if (change) {
+          textContent += `\n${changeType.toUpperCase()} Change:\n`;
+          textContent += `  Old Value: "${change.oldValue}"\n`;
+          textContent += `  New Value: "${change.newValue}"\n`;
+          textContent += `  Changed By: ${change.changedBy}\n`;
+          textContent += `  Timestamp: ${change.timestamp.toLocaleString()}\n`;
+        }
+      });
+      
+      textContent += `\nFirebase ID: ${pokemonId}\n\n`;
     });
 
     // Create and download the file
@@ -1063,13 +1124,17 @@ const Home = () => {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `pokemon_changes_${new Date().toISOString().split('T')[0]}.txt`;
+    link.download = `pokemon_changes_all_types_${new Date().toISOString().split('T')[0]}.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
 
-    showNotification(`✅ Exported ${sortedEntries.length} Pokemon changes!`, 'success');
+    const totalChanges = sortedEntries.reduce((total, [, data]) => 
+      total + Object.keys(data.changes).length, 0
+    );
+    
+    showNotification(`✅ Exported ${totalChanges} changes for ${sortedEntries.length} Pokemon!`, 'success');
   };
 
   // Evolution Methods functions
