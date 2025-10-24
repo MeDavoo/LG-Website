@@ -1120,7 +1120,7 @@ const Home = () => {
     textContent += `Note: Shows all types of changes for each Pokemon.\n`;
     textContent += `Changes are tracked across all devices and users.\n\n`;
 
-    sortedEntries.forEach(([pokemonId, data]) => {
+    sortedEntries.forEach(([, data]) => {
       // Safety check for changes object - handle both old and new data structures
       const changes = data.changes || {};
       const changeTypes = Object.keys(changes);
