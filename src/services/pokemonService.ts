@@ -9,7 +9,8 @@ import {
   getDoc,
   query, 
   orderBy, 
-  where
+  where,
+  deleteField
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
@@ -25,6 +26,7 @@ export interface Pokemon {
   types: string[];
   unique?: string; // U0, U1, U2 for unique Pokemon
   evolutionStage?: number; // 0=base, 1=first evo, 2=second evo, 3=GMAX, 4=Legendary, 5=MEGA
+  evolutionMethod?: string; // Text describing how this Pokemon evolves (e.g., "lvl 34", "Moon Stone", "high friendship")
   info?: string; // Optional info text for tooltip display
   favoriteCount?: number; // Total number of favorites for this Pokemon
   artworkDate?: Date; // Date when the artwork was created
@@ -1137,13 +1139,14 @@ export const cleanupLowVoteDevices = async (maxVotes: number = 2, confirmationTe
 };
 
 // Stats and Abilities Functions
-export const updatePokemonStats = async (pokemonId: string, stats: any, ability: any): Promise<boolean> => {
+export const updatePokemonStats = async (pokemonId: string, stats: any, ability: string, hiddenAbility?: string): Promise<boolean> => {
   try {
-    console.log(`📊 Updating stats for Pokemon ${pokemonId}...`);
+    console.log(`📊 SERVICE: Updating stats for Pokemon ${pokemonId}...`);
+    console.log(`📊 SERVICE: Received data:`, { stats, ability, hiddenAbility });
     
     const pokemonRef = doc(db, COLLECTION_NAME, pokemonId);
     
-    const updates = {
+    const updates: any = {
       stats: {
         hp: stats.hp,
         attack: stats.attack,
@@ -1153,17 +1156,24 @@ export const updatePokemonStats = async (pokemonId: string, stats: any, ability:
         speed: stats.speed,
         total: stats.total
       },
-      ability: {
-        id: ability.id,
-        name: ability.name,
-        description: ability.description
-      },
+      ability: ability,
       updatedAt: new Date()
     };
+
+    // Handle hidden ability - add if provided, remove if empty
+    if (hiddenAbility && hiddenAbility.trim()) {
+      updates.hiddenAbility = hiddenAbility.trim();
+      console.log(`📊 SERVICE: Adding hiddenAbility: "${hiddenAbility.trim()}"`);
+    } else {
+      updates.hiddenAbility = deleteField();
+      console.log(`📊 SERVICE: Removing hiddenAbility field`);
+    }
+    
+    console.log(`📊 SERVICE: Final updates object:`, updates);
     
     await updateDoc(pokemonRef, updates);
     
-    console.log('✅ Pokemon stats updated successfully');
+    console.log('✅ SERVICE: Pokemon stats updated successfully in Firebase');
     
     // Clear cache after modification
     await clearCacheAfterChange();
@@ -1175,23 +1185,43 @@ export const updatePokemonStats = async (pokemonId: string, stats: any, ability:
   }
 };
 
-export const getPokemonStats = async (pokemonId: string): Promise<{stats?: any, ability?: any} | null> => {
+export const getPokemonStats = async (pokemonId: string): Promise<{stats?: any, ability?: string, hiddenAbility?: string} | null> => {
   try {
-    console.log(`📊 Loading stats for Pokemon ${pokemonId}...`);
+    console.log(`📊 SERVICE: Loading stats for Pokemon ${pokemonId}...`);
     
     const pokemonRef = doc(db, COLLECTION_NAME, pokemonId);
     const pokemonDoc = await getDoc(pokemonRef);
     
     if (!pokemonDoc.exists()) {
-      console.log('❌ Pokemon not found');
+      console.log('❌ SERVICE: Pokemon not found');
       return null;
     }
     
     const data = pokemonDoc.data();
-    return {
+    console.log(`📊 SERVICE: Raw data from Firebase:`, data);
+    
+    // Handle both old format (ability as object) and new format (ability as string)
+    let abilityValue = null;
+    if (data.ability) {
+      if (typeof data.ability === 'object' && data.ability.name) {
+        // Old format - extract name from object
+        abilityValue = data.ability.name;
+        console.log(`📊 SERVICE: Converted old format ability: ${abilityValue}`);
+      } else if (typeof data.ability === 'string') {
+        // New format - use string directly
+        abilityValue = data.ability;
+        console.log(`📊 SERVICE: Using new format ability: ${abilityValue}`);
+      }
+    }
+    
+    const result = {
       stats: data.stats || null,
-      ability: data.ability || null
+      ability: abilityValue,
+      hiddenAbility: data.hiddenAbility || null
     };
+    
+    console.log(`📊 SERVICE: Returning stats:`, result);
+    return result;
   } catch (error) {
     console.error('❌ Error loading Pokemon stats:', error);
     return null;

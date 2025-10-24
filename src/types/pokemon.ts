@@ -167,7 +167,6 @@ export const POKEMON_ABILITIES: PokemonAbility[] = [
 
   // Psychic Type Abilities
   { id: "synchronize", name: "Synchronize", description: "When the bearer becomes poisoned, paralyzed or burned, the attacker receives the same status condition.", type: PokemonType.PSYCHIC },
-  { id: "trace", name: "Trace", description: "When the bearer enters battle, it copies a random foe's ability.", type: PokemonType.PSYCHIC },
   { id: "magic-guard", name: "Magic Guard", description: "The bearer only takes damage from moves. It is not affected by poison, burn, sandstorm, hail, recoil, etc.", type: PokemonType.PSYCHIC },
   { id: "magic-bounce", name: "Magic Bounce", description: "The bearer reflects status moves back at the attacker.", type: PokemonType.PSYCHIC },
   { id: "telepathy", name: "Telepathy", description: "The bearer takes no damage from moves used by allied Pokémon.", type: PokemonType.PSYCHIC },
@@ -191,7 +190,6 @@ export const POKEMON_ABILITIES: PokemonAbility[] = [
 
   // Ghost Type Abilities  
   { id: "cursed-body", name: "Cursed Body", description: "When the bearer is hit by a move, 30% chance of disabling that move for the attacker.", type: PokemonType.GHOST },
-  { id: "frisk", name: "Frisk", description: "When the bearer enters battle, it identifies the held items of all foes.", type: PokemonType.GHOST },
   { id: "infiltrator", name: "Infiltrator", description: "The bearer's moves ignore substitutes and the effects of Reflect, Light Screen, Safeguard, Mist and Aurora Veil.", type: PokemonType.GHOST },
   { id: "shadow-tag", name: "Shadow Tag", description: "The bearer's foes cannot switch out or flee.", type: PokemonType.GHOST },
 
@@ -205,7 +203,6 @@ export const POKEMON_ABILITIES: PokemonAbility[] = [
   { id: "unnerve", name: "Unnerve", description: "The bearer's foes cannot eat held Berries.", type: PokemonType.DARK },
   { id: "dark-aura", name: "Dark Aura", description: "The power of all Dark-type moves is boosted by 33%.", type: PokemonType.DARK },
   { id: "moxie", name: "Moxie", description: "When the bearer knocks out a foe, its Attack is boosted by 1 stage.", type: PokemonType.DARK },
-  { id: "intimidate", name: "Intimidate", description: "When the bearer enters battle, the Attack of all foes is lowered by 1 stage.", type: PokemonType.DARK },
 
   // Steel Type Abilities
   { id: "magnet-pull", name: "Magnet Pull", description: "Steel-type foes cannot switch out or flee.", type: PokemonType.STEEL },
@@ -234,36 +231,35 @@ export const POKEMON_ABILITIES: PokemonAbility[] = [
 
   // Additional Fire Type Abilities
   { id: "white-smoke", name: "White Smoke", description: "The bearer's stats cannot be lowered by other Pokemon.", type: PokemonType.FIRE },
-  { id: "magma-armor", name: "Magma Armor", description: "The bearer cannot become frozen and eggs hatch twice as fast.", type: PokemonType.FIRE },
 
   // Additional Water Type Abilities
-  { id: "water-veil", name: "Water Veil", description: "The bearer cannot become burned.", type: PokemonType.WATER },
-  { id: "storm-drain", name: "Storm Drain", description: "The bearer is immune to Water-type moves and redirects them.", type: PokemonType.WATER },
-  { id: "swift-swim", name: "Swift Swim", description: "The bearer's Speed is doubled in rain weather.", type: PokemonType.WATER },
+  { id: "water-veil-2", name: "Water Veil", description: "The bearer cannot become burned.", type: PokemonType.WATER },
+  { id: "storm-drain-2", name: "Storm Drain", description: "The bearer is immune to Water-type moves and redirects them.", type: PokemonType.WATER },
+  { id: "swift-swim-2", name: "Swift Swim", description: "The bearer's Speed is doubled in rain weather.", type: PokemonType.WATER },
 
   // Additional Electric Type Abilities  
-  { id: "lightning-rod", name: "Lightning Rod", description: "The bearer is immune to Electric-type moves and redirects them.", type: PokemonType.ELECTRIC },
-  { id: "motor-drive", name: "Motor Drive", description: "The bearer is immune to Electric-type moves and boosts Speed when hit.", type: PokemonType.ELECTRIC },
+  { id: "lightning-rod-2", name: "Lightning Rod", description: "The bearer is immune to Electric-type moves and redirects them.", type: PokemonType.ELECTRIC },
+  { id: "motor-drive-2", name: "Motor Drive", description: "The bearer is immune to Electric-type moves and boosts Speed when hit.", type: PokemonType.ELECTRIC },
   { id: "plus", name: "Plus", description: "The bearer's Special Attack is boosted by 50% while the bearer's ally has Plus or Minus.", type: PokemonType.ELECTRIC },
   { id: "minus", name: "Minus", description: "The bearer's Special Attack is boosted by 50% while the bearer's ally has Plus or Minus.", type: PokemonType.ELECTRIC },
 
   // Additional Grass Type Abilities
-  { id: "sap-sipper", name: "Sap Sipper", description: "The bearer is immune to Grass-type moves and boosts Attack when hit.", type: PokemonType.GRASS },
-  { id: "leaf-guard", name: "Leaf Guard", description: "In sunny weather, the bearer cannot obtain a non-volatile status problem.", type: PokemonType.GRASS },
-  { id: "flower-veil", name: "Flower Veil", description: "All Grass-type Pokemon on the bearer's side cannot obtain status problems.", type: PokemonType.GRASS },
-  { id: "flower-gift", name: "Flower Gift", description: "The bearer's Attack and Special Defense are boosted by 50% in sunny weather.", type: PokemonType.GRASS },
-  { id: "grass-pelt", name: "Grass Pelt", description: "The bearer's Defense is boosted by 50% while Grassy Terrain is in effect.", type: PokemonType.GRASS },
+  { id: "sap-sipper-2", name: "Sap Sipper", description: "The bearer is immune to Grass-type moves and boosts Attack when hit.", type: PokemonType.GRASS },
+  { id: "leaf-guard-2", name: "Leaf Guard", description: "In sunny weather, the bearer cannot obtain a non-volatile status problem.", type: PokemonType.GRASS },
+  { id: "flower-veil-2", name: "Flower Veil", description: "All Grass-type Pokemon on the bearer's side cannot obtain status problems.", type: PokemonType.GRASS },
+  { id: "flower-gift-2", name: "Flower Gift", description: "The bearer's Attack and Special Defense are boosted by 50% in sunny weather.", type: PokemonType.GRASS },
+  { id: "grass-pelt-2", name: "Grass Pelt", description: "The bearer's Defense is boosted by 50% while Grassy Terrain is in effect.", type: PokemonType.GRASS },
   { id: "grassy-surge", name: "Grassy Surge", description: "When the bearer enters battle, the field becomes Grassy Terrain.", type: PokemonType.GRASS },
 
   // Additional Ice Type Abilities
-  { id: "snow-cloak", name: "Snow Cloak", description: "The bearer's evasion is boosted by 25% in hail weather and takes no hail damage.", type: PokemonType.ICE },
-  { id: "snow-warning", name: "Snow Warning", description: "When the bearer enters battle, starts hail weather.", type: PokemonType.ICE },
+  { id: "snow-cloak-2", name: "Snow Cloak", description: "The bearer's evasion is boosted by 25% in hail weather and takes no hail damage.", type: PokemonType.ICE },
+  { id: "snow-warning-2", name: "Snow Warning", description: "When the bearer enters battle, starts hail weather.", type: PokemonType.ICE },
   { id: "refrigerate", name: "Refrigerate", description: "The bearer's Normal-type moves become Ice-type and gain 30% power.", type: PokemonType.ICE },
   { id: "slush-rush", name: "Slush Rush", description: "The bearer's Speed is doubled in hail weather.", type: PokemonType.ICE },
 
   // Additional Fighting Type Abilities
   { id: "no-guard", name: "No Guard", description: "The bearer's moves and moves targeting the bearer will always hit.", type: PokemonType.FIGHTING },
-  { id: "iron-fist", name: "Iron Fist", description: "The power of the bearer's punching moves is boosted by 20%.", type: PokemonType.FIGHTING },
+  { id: "iron-fist-2", name: "Iron Fist", description: "The power of the bearer's punching moves is boosted by 20%.", type: PokemonType.FIGHTING },
   { id: "reckless", name: "Reckless", description: "The power of the bearer's recoil-inflicting moves is boosted by 20%.", type: PokemonType.FIGHTING },
 
   // Additional Poison Type Abilities
@@ -279,12 +275,12 @@ export const POKEMON_ABILITIES: PokemonAbility[] = [
   { id: "delta-stream", name: "Delta Stream", description: "When the bearer enters battle, starts windy weather that weakens Flying-type weaknesses.", type: PokemonType.FLYING },
 
   // Additional Psychic Type Abilities
-  { id: "forewarn", name: "Forewarn", description: "When the bearer enters battle, announces the foe's strongest move.", type: PokemonType.PSYCHIC },
-  { id: "anticipation", name: "Anticipation", description: "When the bearer enters battle, senses if foes have super-effective or OHKO moves.", type: PokemonType.PSYCHIC },
+  { id: "forewarn-2", name: "Forewarn", description: "When the bearer enters battle, announces the foe's strongest move.", type: PokemonType.PSYCHIC },
+  { id: "anticipation-2", name: "Anticipation", description: "When the bearer enters battle, senses if foes have super-effective or OHKO moves.", type: PokemonType.PSYCHIC },
   { id: "wonder-skin", name: "Wonder Skin", description: "Lowers the accuracy of status moves that target the bearer to 50%.", type: PokemonType.PSYCHIC },
 
   // Additional Bug Type Abilities
-  { id: "run-away", name: "Run Away", description: "The bearer can always flee from battle.", type: PokemonType.BUG },
+  { id: "run-away-2", name: "Run Away", description: "The bearer can always flee from battle.", type: PokemonType.BUG },
 
   // Additional Rock Type Abilities
   { id: "shell-armor", name: "Shell Armor", description: "The chance of a move used against the bearer being a critical hit is 0.", type: PokemonType.ROCK },
@@ -297,7 +293,7 @@ export const POKEMON_ABILITIES: PokemonAbility[] = [
 
   // Additional Dark Type Abilities
   { id: "prankster", name: "Prankster", description: "Increases the priority of the bearer's status moves by 1.", type: PokemonType.DARK },
-  { id: "super-luck", name: "Super Luck", description: "The chance of a bearer's move being a critical hit is increased.", type: PokemonType.DARK },
+  { id: "super-luck-2", name: "Super Luck", description: "The chance of a bearer's move being a critical hit is increased.", type: PokemonType.DARK },
 
   // Additional Steel Type Abilities
   { id: "bulletproof", name: "Bulletproof", description: "The bearer is immune to ballistic moves.", type: PokemonType.STEEL },

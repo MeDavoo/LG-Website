@@ -5,8 +5,9 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { clearAllCache, getCacheStats, clearRatingsCache } from '../services/cacheService';
-import StatsEditor from '../components/StatsEditor';
-import { PokemonStats, PokemonAbility } from '../types/pokemon';
+import StatsViewer from '../components/StatsViewer';
+import EvolutionEditor from '../components/EvolutionEditor';
+import { PokemonStats } from '../types/pokemon';
 
 interface PokemonSlot {
   id: number;
@@ -70,6 +71,7 @@ const Home = () => {
       const firebasePokemon = await getAllPokemon();
       console.log('📦 Retrieved Pokemon from Firebase:', firebasePokemon.length, 'Pokemon');
       console.log('📋 First Pokemon:', firebasePokemon[0]);
+      console.log('🧬 Pokemon with evolution methods:', firebasePokemon.filter(p => p.evolutionMethod).map(p => ({ name: p.name, evolutionMethod: p.evolutionMethod })));
       setPokemonData(firebasePokemon);
       
       // Create slots dynamically based on the highest pokedex number or Pokemon count
@@ -629,9 +631,14 @@ const Home = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
 
-  // Stats Editor state
+  // Stats Viewer state
+  const [showStats, setShowStats] = useState(false);
   const [isStatsEditorMode, setIsStatsEditorMode] = useState(false);
-  const [pokemonStats, setPokemonStats] = useState<{stats?: PokemonStats, ability?: PokemonAbility} | null>(null);
+  const [pokemonStats, setPokemonStats] = useState<{stats?: PokemonStats, ability?: string, hiddenAbility?: string} | null>(null);
+
+  // Evolution Methods state
+  const [isEvolutionEditMode, setIsEvolutionEditMode] = useState(false);
+  const [evolutionMethods, setEvolutionMethods] = useState<{[pokemonId: string]: string}>({});
 
   // Auto-select first Pokemon with artwork when data loads
   useEffect(() => {
@@ -808,7 +815,11 @@ const Home = () => {
     }, 5000); // Hide after 5 seconds (increased from 4)
   };
 
-  // Stats Editor functions
+  // Stats Viewer functions
+  const toggleStatsViewer = () => {
+    setShowStats(!showStats);
+  };
+
   const toggleStatsEditor = async () => {
     if (!selectedPokemon?.firebaseId) return;
     
@@ -821,25 +832,84 @@ const Home = () => {
     setIsStatsEditorMode(!isStatsEditorMode);
   };
 
-  const handleSaveStats = async (stats: PokemonStats, ability: PokemonAbility) => {
+  const handleSaveStats = async (stats: PokemonStats, ability: string, hiddenAbility?: string) => {
     if (!selectedPokemon?.firebaseId) return;
     
-    const success = await updatePokemonStats(selectedPokemon.firebaseId, stats, ability);
-    if (success) {
-      showNotification('✅ Stats and ability saved successfully!', 'success');
-      // Update local state
-      setPokemonStats({ stats, ability });
-    } else {
+    console.log('🔍 DEBUG: handleSaveStats called with:', {
+      pokemonId: selectedPokemon.firebaseId,
+      stats,
+      ability,
+      hiddenAbility
+    });
+    
+    try {
+      // Call the updated service with string parameters
+      await updatePokemonStats(selectedPokemon.firebaseId, stats, ability, hiddenAbility);
+      
+      // Update local state with the new format
+      setPokemonStats({ stats, ability, hiddenAbility });
+      
+      console.log('✅ LOCAL: Stats saved to local state');
+      showNotification('✅ Stats and abilities saved successfully!', 'success');
+    } catch (error) {
+      console.error('❌ ERROR in handleSaveStats:', error);
       showNotification('❌ Failed to save stats. Please try again.', 'error');
+      throw error; // Re-throw to let StatsViewer handle the error
     }
   };
 
-  // Load stats when selected Pokemon changes
+  // Load stats when selected Pokemon changes or stats viewer is opened
   useEffect(() => {
-    if (selectedPokemon?.firebaseId && isStatsEditorMode) {
-      getPokemonStats(selectedPokemon.firebaseId).then(setPokemonStats);
+    if (selectedPokemon?.firebaseId && (showStats || isStatsEditorMode)) {
+      getPokemonStats(selectedPokemon.firebaseId).then(currentStats => {
+        console.log('🏠 HOME: Received stats from service:', currentStats);
+        if (currentStats) {
+          // Use the new format directly - no conversion needed
+          setPokemonStats(currentStats);
+        } else {
+          setPokemonStats(null);
+        }
+      });
     }
-  }, [selectedPokemon?.firebaseId, isStatsEditorMode]);
+  }, [selectedPokemon?.firebaseId, showStats, isStatsEditorMode]);
+
+  // Evolution Methods functions
+  const toggleEvolutionEditMode = () => {
+    setIsEvolutionEditMode(!isEvolutionEditMode);
+  };
+
+  const handleSaveEvolutionMethod = async (pokemonId: string, method: string) => {
+    try {
+      await updatePokemon(pokemonId, { evolutionMethod: method.trim() || undefined });
+      setEvolutionMethods(prev => ({ ...prev, [pokemonId]: method.trim() }));
+      showNotification('Evolution method saved successfully!', 'success');
+    } catch (error) {
+      console.error('Error saving evolution method:', error);
+      showNotification('Failed to save evolution method', 'error');
+    }
+  };
+
+  // Load evolution methods when Pokemon data loads
+  useEffect(() => {
+    const loadEvolutionMethods = () => {
+      const methods: {[pokemonId: string]: string} = {};
+      _pokemonData.forEach(pokemon => {
+        if (pokemon.evolutionMethod && pokemon.id) {
+          // Use the Firebase document ID (pokemon.id) as the key
+          methods[pokemon.id] = pokemon.evolutionMethod;
+          console.log(`🔍 Found evolution method: ${pokemon.name} (${pokemon.id}) -> "${pokemon.evolutionMethod}"`);
+        }
+      });
+      setEvolutionMethods(methods);
+      console.log('📋 Loaded evolution methods:', methods);
+      console.log('📋 Total Pokemon data loaded:', _pokemonData.length);
+      console.log('📋 Pokemon with evolution methods:', Object.keys(methods).length);
+    };
+
+    if (_pokemonData.length > 0) {
+      loadEvolutionMethods();
+    }
+  }, [_pokemonData]);
 
   // 3D Image Animation functions
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1539,6 +1609,184 @@ const Home = () => {
     }
   };
 
+  // Function to generate and download Pokémon data as text file
+  const generatePokemonDataFile = async () => {
+    // Get all Pokémon with artwork (filters out empty slots)
+    const pokemonWithArt = pokemonSlots.filter(pokemon => pokemon.hasArt);
+    
+    // Helper function to analyze stat priorities from base form stats
+    const analyzeStatPriorities = (stats: any) => {
+      // Ensure we have valid numbers, default to 0 if undefined/null
+      const statValues = [
+        { name: 'HP', value: Number(stats.hp) || 0 },
+        { name: 'Atk', value: Number(stats.attack) || 0 },
+        { name: 'Def', value: Number(stats.defense) || 0 },
+        { name: 'SpAtk', value: Number(stats.spAttack) || 0 },
+        { name: 'SpDef', value: Number(stats.spDefense) || 0 },
+        { name: 'Spd', value: Number(stats.speed) || 0 }
+      ];
+      
+      // Check if all stats are 0 (no stats set)
+      const totalStats = statValues.reduce((sum, stat) => sum + stat.value, 0);
+      if (totalStats === 0) {
+        return 'No stats set';
+      }
+      
+      // Find stats significantly above/below default with more sensitive thresholds
+      const veryHighStats = statValues.filter(stat => stat.value > 200).sort((a, b) => b.value - a.value);
+      const highStats = statValues.filter(stat => stat.value > 130 && stat.value <= 200).sort((a, b) => b.value - a.value);
+      const lowStats = statValues.filter(stat => stat.value < 70 && stat.value > 30).sort((a, b) => a.value - b.value);
+      const veryLowStats = statValues.filter(stat => stat.value <= 30 && stat.value > 0).sort((a, b) => a.value - b.value);
+      
+      let priority = '';
+      
+      if (veryHighStats.length > 0) {
+        priority += `Primary: ${veryHighStats.map(s => `${s.name}(${s.value})`).join(', ')}`;
+      }
+      if (highStats.length > 0) {
+        if (priority) priority += ' | ';
+        priority += `Good: ${highStats.map(s => `${s.name}(${s.value})`).join(', ')}`;
+      }
+      if (veryLowStats.length > 0) {
+        if (priority) priority += ' | ';
+        priority += `VeryWeak: ${veryLowStats.map(s => `${s.name}(${s.value})`).join(', ')}`;
+      } else if (lowStats.length > 0) {
+        if (priority) priority += ' | ';
+        priority += `Weak: ${lowStats.map(s => `${s.name}(${s.value})`).join(', ')}`;
+      }
+      
+      // If no clear priorities found, show all stat values for debugging
+      if (!priority) {
+        priority = `All stats: ${statValues.map(s => `${s.name}(${s.value})`).join(', ')}`;
+      }
+      
+      return priority;
+    };
+    
+    // Create the text content
+    let textContent = 'Pokémon Data Export with Stat Priorities\n';
+    textContent += '=======================================\n\n';
+    textContent += 'Format: Name | Type1 | Type2 | Evolution Stage | Stat Priorities\n';
+    textContent += 'Stat Priorities: Best (>150), Good (120-150), Weak (<50)\n';
+    textContent += 'Lines are separated by "---" when a new evolutionary line begins\n\n';
+    
+    let previousEvolutionStage: number | undefined = undefined;
+    let currentLineStatPriority = '';
+    
+    for (const [index, pokemon] of pokemonWithArt.entries()) {
+      const name = pokemon.name;
+      const type1 = pokemon.types?.[0] || 'Unknown';
+      const type2 = pokemon.types?.[1] || 'None';
+      const currentStage = pokemon.evolutionStage;
+      
+      // Check if this is the start of a new evolutionary line
+      if (index > 0 && previousEvolutionStage !== undefined && currentStage !== undefined) {
+        // New line starts if:
+        // 1. Current stage is 0 (base form) - always starts new line
+        // 2. Current stage is lower than previous (going backwards, but not GMAX/MEGA which continue the line)
+        // 3. Current stage is Legendary (special standalone forms)
+        const isNewLine = 
+          (currentStage === 0) || // New base form always starts new line
+          (currentStage < previousEvolutionStage && currentStage !== 3 && currentStage !== 5) || // Going backwards (but GMAX and MEGA continue line)
+          (currentStage === 4) || // Legendary forms are always separate
+          (previousEvolutionStage === 4 && currentStage < 4); // Coming back from Legendary
+        
+        if (isNewLine) {
+          textContent += '\n--- New Evolutionary Line ---\n';
+          currentLineStatPriority = ''; // Reset for new line
+        }
+      }
+      
+      // Get stat priorities for base forms (stage 0) and legendaries
+      let statPriority = '';
+      if ((currentStage === 0 || currentStage === 4) && pokemon.firebaseId) {
+        try {
+          const result = await getPokemonStats(pokemon.firebaseId);
+          console.log(`Raw result for ${name}:`, result);
+          if (result && result.stats) {
+            // Add safety checks and debugging
+            const safeStats = {
+              hp: result.stats.hp || 0,
+              attack: result.stats.attack || 0,
+              defense: result.stats.defense || 0,
+              spAttack: result.stats.spAttack || 0,
+              spDefense: result.stats.spDefense || 0,
+              speed: result.stats.speed || 0
+            };
+            console.log(`Safe stats for ${name}:`, safeStats);
+            statPriority = analyzeStatPriorities(safeStats);
+            if (currentStage === 0) {
+              currentLineStatPriority = statPriority; // Save for entire evolutionary line
+            }
+            console.log(`Final priority for ${name}:`, statPriority);
+          } else {
+            statPriority = 'No stats found';
+            console.log(`No stats found for ${name} - result:`, result);
+          }
+        } catch (error) {
+          console.warn(`Could not get stats for ${name}:`, error);
+          statPriority = 'Error loading stats';
+        }
+      } else if (currentLineStatPriority) {
+        statPriority = currentLineStatPriority; // Use the base form's stat priority for evolutions
+      } else {
+        statPriority = 'No base stats available';
+      }
+      
+      // Convert evolution stage number to readable format
+      let evolutionStage = 'Unknown';
+      if (pokemon.evolutionStage !== undefined) {
+        switch (pokemon.evolutionStage) {
+          case 0:
+            evolutionStage = 'Base Form';
+            break;
+          case 1:
+            evolutionStage = 'First Evolution';
+            break;
+          case 2:
+            evolutionStage = 'Second Evolution';
+            break;
+          case 3:
+            evolutionStage = 'GMAX';
+            break;
+          case 4:
+            evolutionStage = 'Legendary';
+            break;
+          case 5:
+            evolutionStage = 'MEGA';
+            break;
+          default:
+            evolutionStage = `Stage ${pokemon.evolutionStage}`;
+        }
+      }
+      
+      textContent += `${name} | ${type1} | ${type2} | ${evolutionStage} | ${statPriority}\n`;
+      previousEvolutionStage = currentStage;
+    }
+    
+    // Add summary at the end
+    textContent += `\n\nTotal Pokémon: ${pokemonWithArt.length}\n`;
+    textContent += `Generated on: ${new Date().toLocaleString()}\n`;
+    textContent += `\nNOTE: If many Pokemon show as "Balanced", "No stats found", or "No base stats available",\n`;
+    textContent += `you need to use the Stats Editor (⚙️ button) to set the indicator stats for base forms first.\n`;
+    textContent += `Example: Set base form to Speed=255, Attack=140 to indicate Speed/Attack focus.\n`;
+    
+    console.log('Export completed. Check console for individual Pokemon stat details.');
+    
+    // Create and download the file
+    const blob = new Blob([textContent], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pokemon_data_with_stats_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    showNotification(`✅ Exported ${pokemonWithArt.length} Pokémon with stat analysis! Check console for details.`, 'success');
+  };
+
   return (
     <>
       <Navbar />
@@ -2190,6 +2438,13 @@ const Home = () => {
                         title="Cache Management"
                       >
                         🗄️
+                      </button>
+                      <button
+                        onClick={generatePokemonDataFile}
+                        className="px-2 py-1 rounded-lg font-semibold transition-all text-sm bg-green-500 text-white hover:bg-green-600"
+                        title="Export Pokemon Data to Text File"
+                      >
+                        📄
                       </button>
                     </div>
                   )}
@@ -2890,17 +3145,41 @@ const Home = () => {
                       )}
                     </div>
                     
-                    {/* Stats Editor Section (Admin Only) */}
-                    {isAdmin && isStatsEditorMode && selectedPokemon?.firebaseId && (
-                      <div className="mt-4 mb-4">
-                        <StatsEditor
-                          pokemonId={selectedPokemon.firebaseId}
-                          initialStats={pokemonStats?.stats}
-                          initialAbility={pokemonStats?.ability}
-                          onSave={handleSaveStats}
-                        />
+                    {/* Stats Dropdown Section - Above Ratings */}
+                    <div className="mt-4 mb-3">
+                      {/* Stats Dropdown Toggle Button */}
+                      <button
+                        onClick={toggleStatsViewer}
+                        className="w-full flex items-center justify-center gap-2 py-2 text-white/80 hover:text-white transition-colors group"
+                      >
+                        <span className="text-sm font-medium">Stats & Abilities</span>
+                        <span className={`transform transition-transform duration-200 ${
+                          showStats ? 'rotate-180' : 'rotate-0'
+                        }`}>
+                          ▼
+                        </span>
+                      </button>
+                      
+                      {/* Stats Dropdown Content - Expands below button */}
+                      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                        showStats ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'
+                      }`}>
+                        {showStats && selectedPokemon?.firebaseId && (
+                          <div className="mt-3">
+                            <StatsViewer
+                              pokemonId={selectedPokemon.firebaseId}
+                              initialStats={pokemonStats?.stats}
+                              initialAbility={pokemonStats?.ability}
+                              initialHiddenAbility={pokemonStats?.hiddenAbility}
+                              onSave={handleSaveStats}
+                              isEditMode={isStatsEditorMode}
+                              isAdmin={isAdmin}
+                              onToggleEditMode={toggleStatsEditor}
+                            />
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                     
                     {/* Star Rating System with Half-Stars */}
                     <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/10">
@@ -3148,146 +3427,142 @@ const Home = () => {
                         
                         // Determine if we need compact layout (more than 3 stages)
                         // Dynamic layout based on screen size and number of stages
-                        const isCompactLayout = sortedStages.length >= 3; // More aggressive: start compacting at 3+ stages
-                        const isMobileCompact = sortedStages.length >= 3; // More aggressive on mobile
-                        const isUltraCompact = sortedStages.length >= 4; // Ultra compact for 4+ stages
+                        // Layout flags for potential future use
+                        // const isCompactLayout = sortedStages.length >= 3; // More aggressive: start compacting at 3+ stages
+                        // const isMobileCompact = sortedStages.length >= 3; // More aggressive on mobile
+                        // const isUltraCompact = sortedStages.length >= 4; // Ultra compact for 4+ stages
+                        
+                        // Dynamic scaling based on number of stages - prevents wrapping
+                        const getScaleClass = () => {
+                          if (sortedStages.length <= 2) return 'scale-100'; // Normal size for 1-2 stages
+                          if (sortedStages.length === 3) return 'scale-85'; // 85% for 3 stages
+                          if (sortedStages.length === 4) return 'scale-70'; // 70% for 4 stages
+                          if (sortedStages.length === 5) return 'scale-60'; // 60% for 5 stages
+                          if (sortedStages.length === 6) return 'scale-50'; // 50% for 6 stages
+                          return 'scale-40'; // 40% for 7+ stages (very compact)
+                        };
+                        
+                        // Dynamic gap based on number of stages
+                        const getDynamicGap = () => {
+                          if (sortedStages.length <= 2) return 'gap-6'; // Large gap for few stages
+                          if (sortedStages.length === 3) return 'gap-3'; // Medium gap
+                          if (sortedStages.length === 4) return 'gap-2'; // Small gap
+                          if (sortedStages.length >= 5) return 'gap-1'; // Very small gap for many stages
+                          return 'gap-1';
+                        };
+                        
+                        // Dynamic image size based on number of stages
+                        const getImageSize = () => {
+                          if (sortedStages.length <= 2) return 'w-14 h-14'; // Large for few stages
+                          if (sortedStages.length === 3) return 'w-12 h-12'; // Medium
+                          if (sortedStages.length === 4) return 'w-10 h-10'; // Small
+                          return 'w-8 h-8'; // Very small for many stages
+                        };
+                        
+                        // Dynamic arrow size
+                        const getArrowSize = () => {
+                          if (sortedStages.length <= 2) return { width: "28", height: "28" };
+                          if (sortedStages.length === 3) return { width: "24", height: "24" };
+                          if (sortedStages.length === 4) return { width: "20", height: "20" };
+                          return { width: "16", height: "16" };
+                        };
+                        
+                        const arrowSize = getArrowSize();
                         
                         return (
-                          <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10">
-                            <h4 className="text-white/80 text-sm font-semibold mb-3 text-center">Evolution Line</h4>
-                            <div className={`flex items-center justify-center ${
-                              isUltraCompact 
-                                ? 'gap-0.5 flex-wrap' // Ultra tight spacing and allow wrapping
-                                : isCompactLayout 
-                                  ? 'gap-1' 
-                                  : 'gap-4'
-                            } ${
-                              isMobileCompact ? 'md:gap-4' : ''
-                            }`}>
+                          <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10 relative">
+                            {/* Evolution Line Header with Admin Edit Button */}
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="text-white/80 text-sm font-semibold text-center flex-1">Evolution Line</h4>
+                              
+                              {/* Small Admin Edit Button - Top Right Corner */}
+                              {isAdmin && (
+                                <button
+                                  onClick={toggleEvolutionEditMode}
+                                  className={`ml-2 p-1.5 rounded-md transition-all duration-200 text-xs hover:scale-110 ${
+                                    isEvolutionEditMode 
+                                      ? 'bg-orange-500/20 border border-orange-400/40 text-orange-300 hover:bg-orange-500/30' 
+                                      : 'bg-purple-500/20 border border-purple-400/40 text-purple-300 hover:bg-purple-500/30'
+                                  }`}
+                                  title={isEvolutionEditMode ? 'Exit evolution editing mode' : 'Edit evolution methods'}
+                                >
+                                  {isEvolutionEditMode ? 'View' : '✏️ Edit'}
+                                </button>
+                              )}
+                            </div>
+                            
+                            {/* Evolution Line with Dynamic Scaling - Never Wraps, No Scrollbars */}
+                            <div className={`flex items-center justify-center ${getDynamicGap()} ${getScaleClass()} transform-gpu transition-transform duration-300`}>
                               {sortedStages.map((stage, stageIndex) => (
-                                <div key={stage} className="flex items-center">
-                                  {/* Evolution Stage Column */}
-                                  <div className="flex flex-col gap-1">
+                                <div key={stage} className="flex items-center flex-shrink-0">
+                                  {/* Evolution Stage Column - Images Only */}
+                                  <div className="flex flex-col gap-2">
                                     {stageGroups[stage].map((evolution) => (
                                       <button
                                         key={evolution.id}
                                         onClick={() => setSelectedPokemon(evolution)}
                                         disabled={evolution.id === selectedPokemon.id}
-                                        className={`flex items-center transition-all duration-200 min-w-0 ${
-                                          // Ultra compact sizing for 4+ stages
-                                          isUltraCompact
-                                            ? 'gap-1 px-1 py-1 text-xs'
-                                            : isMobileCompact 
-                                              ? 'gap-1 px-1 py-1 md:gap-2 md:px-3 md:py-2' 
-                                              : isCompactLayout 
-                                                ? 'gap-1 px-2 py-1' 
-                                                : 'gap-2 px-3 py-2'
-                                        } rounded-lg ${
+                                        className={`p-2 rounded-lg transition-all duration-200 flex-shrink-0 ${
                                           evolution.id === selectedPokemon.id
-                                            ? 'bg-yellow-400/30 border border-yellow-400 cursor-default'
-                                            : 'bg-white/10 border border-white/20 hover:bg-white/20 hover:border-white/40 hover:scale-[1.02] cursor-pointer'
+                                            ? 'bg-yellow-400/30 border-2 border-yellow-400 cursor-default scale-110'
+                                            : 'bg-white/10 border-2 border-white/20 hover:bg-white/20 hover:border-white/40 hover:scale-105 cursor-pointer'
                                         }`}
-                                        title={`${evolution.name} - ${
-                                          evolution.evolutionStage === 0 ? 'Base Form' :
-                                          evolution.evolutionStage === 1 ? 'First Evolution' :
-                                          evolution.evolutionStage === 2 ? 'Second Evolution' :
-                                          evolution.evolutionStage === 3 ? 'GMAX Form' :
-                                          evolution.evolutionStage === 4 ? 'Legendary Form' :
-                                          evolution.evolutionStage === 5 ? 'MEGA Form' : 'Unknown Form'
-                                        } ${evolution.id === selectedPokemon.id ? '(Current)' : ''}`}
+                                        title={evolution.name}
                                       >
-                                        <div className={`rounded-lg overflow-hidden border border-white/20 flex-shrink-0 ${
-                                          // Ultra compact image sizing
-                                          isUltraCompact
-                                            ? 'w-5 h-5'
-                                            : isMobileCompact 
-                                              ? 'w-6 h-6 md:w-10 md:h-10' 
-                                              : isCompactLayout 
-                                                ? 'w-8 h-8' 
-                                                : 'w-10 h-10'
-                                        }`}>
+                                        <div className={`${getImageSize()} rounded-lg overflow-hidden border border-white/10 flex-shrink-0`}>
                                           <img
                                             src={evolution.imageUrl}
                                             alt={evolution.name}
                                             className="w-full h-full object-cover"
                                           />
                                         </div>
-                                        <div className="text-left min-w-0 flex-1">
-                                          <div className={`font-semibold ${
-                                            // Ultra compact text sizing
-                                            isUltraCompact
-                                              ? 'text-xs'
-                                              : isMobileCompact 
-                                                ? 'text-xs md:text-xs' 
-                                                : 'text-xs'
-                                          } ${
-                                            evolution.id === selectedPokemon.id ? 'text-yellow-300' : 'text-white'
-                                          }`}>
-                                            #{evolution.id.toString().padStart(3, '0')}
-                                          </div>
-                                          <div className={`font-medium truncate ${
-                                            // Ultra compact text and width sizing
-                                            isUltraCompact
-                                              ? 'text-xs max-w-6' // Very narrow for ultra compact
-                                              : isMobileCompact 
-                                                ? 'text-xs max-w-8 md:text-xs md:max-w-16' 
-                                                : isCompactLayout 
-                                                  ? 'text-xs max-w-12' 
-                                                  : 'text-xs max-w-16'
-                                          } ${
-                                            evolution.id === selectedPokemon.id ? 'text-yellow-200' : 'text-white/90'
-                                          }`}>
-                                            {evolution.name}
-                                          </div>
-                                          <div className={`inline-block rounded font-bold text-white mt-0.5 ${
-                                            // Ultra compact badge sizing
-                                            isUltraCompact
-                                              ? 'text-xs px-0.5 py-0.5'
-                                              : isMobileCompact 
-                                                ? 'text-xs px-1 py-0.5 md:text-xs md:px-1.5 md:py-0.5' 
-                                                : isCompactLayout 
-                                                  ? 'text-xs px-1 py-0.5' 
-                                                  : 'text-xs px-1.5 py-0.5'
-                                          } ${
-                                            evolution.evolutionStage === 0 ? 'bg-green-500' :
-                                            evolution.evolutionStage === 1 ? 'bg-yellow-500' :
-                                            evolution.evolutionStage === 2 ? 'bg-red-500' :
-                                            evolution.evolutionStage === 3 ? 'bg-purple-500' :
-                                            evolution.evolutionStage === 4 ? 'bg-orange-500' :
-                                            evolution.evolutionStage === 5 ? 'bg-pink-500' : 'bg-gray-500'
-                                          }`}>
-                                            {/* Responsive stage labels */}
-                                            {(isMobileCompact || isCompactLayout) ? (
-                                              evolution.evolutionStage === 0 ? 'S0' :
-                                              evolution.evolutionStage === 1 ? 'S1' :
-                                              evolution.evolutionStage === 2 ? 'S2' :
-                                              evolution.evolutionStage === 3 ? 'GM' :
-                                              evolution.evolutionStage === 4 ? 'LG' :
-                                              evolution.evolutionStage === 5 ? 'MG' : `S${evolution.evolutionStage}`
-                                            ) : (
-                                              evolution.evolutionStage === 0 ? 'Stage 0' :
-                                              evolution.evolutionStage === 1 ? 'Stage 1' :
-                                              evolution.evolutionStage === 2 ? 'Stage 2' :
-                                              evolution.evolutionStage === 3 ? 'GMAX' :
-                                              evolution.evolutionStage === 4 ? 'Legendary' :
-                                              evolution.evolutionStage === 5 ? 'MEGA' : `Stage ${evolution.evolutionStage}`
-                                            )}
-                                          </div>
-                                        </div>
                                       </button>
                                     ))}
                                   </div>
                                   
-                                  {/* Arrow between stages - responsive sizing */}
+                                  {/* Arrow between stages with evolution method */}
                                   {stageIndex < sortedStages.length - 1 && (
-                                    <div className={`text-white/40 ${
-                                      isMobileCompact 
-                                        ? 'mx-0.5 text-sm md:mx-2 md:text-xl' 
-                                        : isCompactLayout 
-                                          ? 'mx-1 text-sm' 
-                                          : 'mx-2 text-xl'
-                                    }`}>
-                                      →
+                                    <div className={`flex flex-col items-center ${
+                                      sortedStages.length <= 3 ? 'mx-4' : 'mx-2'
+                                    } gap-1 flex-shrink-0`}>
+                                      {/* Responsive Arrow SVG */}
+                                      <svg 
+                                        width={arrowSize.width} 
+                                        height={arrowSize.height} 
+                                        viewBox="0 0 24 24" 
+                                        fill="none" 
+                                        className="text-white/60 flex-shrink-0"
+                                      >
+                                        <path 
+                                          d="M5 12h14m-7-7l7 7-7 7" 
+                                          stroke="currentColor" 
+                                          strokeWidth="2" 
+                                          strokeLinecap="round" 
+                                          strokeLinejoin="round"
+                                        />
+                                      </svg>
+                                      
+                                      {/* Evolution Method Editor for the next stage's first Pokemon */}
+                                      {stageGroups[sortedStages[stageIndex + 1]]?.[0]?.firebaseId && (
+                                        <>
+                                          {/* Debug info - remove after testing */}
+                                          {console.log('🔍 Evolution Debug:', {
+                                            currentStage: sortedStages[stageIndex],
+                                            nextStage: sortedStages[stageIndex + 1],
+                                            currentStagePokemon: stageGroups[sortedStages[stageIndex]].map(p => `${p.name} (${p.firebaseId})`),
+                                            nextStagePokemon: stageGroups[sortedStages[stageIndex + 1]].map(p => `${p.name} (${p.firebaseId})`),
+                                            targetPokemonId: stageGroups[sortedStages[stageIndex + 1]][0].firebaseId,
+                                            evolutionMethod: evolutionMethods[stageGroups[sortedStages[stageIndex + 1]][0].firebaseId!]
+                                          })}
+                                          <EvolutionEditor
+                                            pokemonId={stageGroups[sortedStages[stageIndex + 1]][0].firebaseId!}
+                                            pokemonName={stageGroups[sortedStages[stageIndex + 1]][0].name}
+                                            initialMethod={evolutionMethods[stageGroups[sortedStages[stageIndex + 1]][0].firebaseId!] || ''}
+                                            isEditMode={isEvolutionEditMode}
+                                            onSave={handleSaveEvolutionMethod}
+                                          />
+                                        </>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -3299,15 +3574,16 @@ const Home = () => {
                       return null;
                     })()}
                     
-                    {/* Actions Dropdown - Only show for Pokemon with artwork */}
-                    {selectedPokemon.firebaseId && (
+                    {/* Actions Dropdown - Only show for Admins with Pokemon artwork */}
+                    {selectedPokemon.firebaseId && isAdmin && (
                       <div className="pt-2 border-t border-white/20">
-                        {/* Dropdown Toggle Button */}
+                        {/* Dropdown Toggle Button - Only visible to admins */}
                         <button
                           onClick={() => setShowActionsDropdown(!showActionsDropdown)}
                           className="w-full px-2 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all duration-300 flex items-center justify-center"
-                          title="Toggle Actions"
+                          title="Admin Actions"
                         >
+                          <span className="text-xs text-white/60 mr-2">Admin Actions</span>
                           <span className={`transform transition-transform duration-300 text-sm ${
                             showActionsDropdown ? 'rotate-180' : 'rotate-0'
                           }`}>
@@ -3320,40 +3596,27 @@ const Home = () => {
                           showActionsDropdown ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
                         }`}>
                           <div className="pt-3">
-                            <div className="flex gap-1">
-                              {/* Edit Button (60% width) */}
-                              <button
-                                onClick={() => requireAdmin(handleEditPokemon)}
-                                className="flex-[3] px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold transform hover:scale-[1.02]"
-                              >
-                                ✏️ Edit Pokemon
-                              </button>
-                              
-                              {/* Delete Button (20% width, emoji only) */}
-                              <button
-                                onClick={() => setShowDeleteConfirm(true)}
-                                className="flex-1 px-2 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-center transform hover:scale-[1.02]"
-                                title="Delete Pokemon"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                            
-                            {/* Stats Editor Toggle Button (Admin Only) */}
-                            {isAdmin && (
-                              <div className="mt-2">
+                            {/* Admin Actions Section */}
+                            <div className="space-y-2">
+                              <div className="flex gap-1">
+                                {/* Edit Button (60% width) */}
                                 <button
-                                  onClick={() => requireAdmin(toggleStatsEditor)}
-                                  className={`w-full px-4 py-2 text-white rounded-lg transition-colors font-semibold transform hover:scale-[1.02] ${
-                                    isStatsEditorMode 
-                                      ? 'bg-orange-500 hover:bg-orange-600' 
-                                      : 'bg-purple-500 hover:bg-purple-600'
-                                  }`}
+                                  onClick={() => requireAdmin(handleEditPokemon)}
+                                  className="flex-[3] px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold transform hover:scale-[1.02]"
                                 >
-                                  {isStatsEditorMode ? '❌ Exit Stats Editor' : 'Edit Stats & Abilities'}
+                                  ✏️ Edit Pokemon
+                                </button>
+                                
+                                {/* Delete Button (20% width, emoji only) */}
+                                <button
+                                  onClick={() => setShowDeleteConfirm(true)}
+                                  className="flex-1 px-2 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-center transform hover:scale-[1.02]"
+                                  title="Delete Pokemon"
+                                >
+                                  🗑️
                                 </button>
                               </div>
-                            )}
+                            </div>
                             
                             {/* Delete Confirmation Dialog */}
                             {showDeleteConfirm && (

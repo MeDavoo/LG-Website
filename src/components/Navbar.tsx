@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BarChart3, Palette, RotateCw } from 'lucide-react';
+import { Home, BarChart3, Palette } from 'lucide-react';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 
 const Navbar = () => {
@@ -9,7 +9,6 @@ const Navbar = () => {
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
     { path: '/challenges', label: 'Challenges', icon: Palette },
-    { path: '/wheels', label: 'Wheels', icon: RotateCw },
     { path: '/statistics', label: 'Statistics', icon: BarChart3 },
   ];
 
