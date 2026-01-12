@@ -13,7 +13,6 @@ A nice website to showcase custom Pokemon artwork with statistics tracking.
 - Dynamic grid layout that grows as Pokemon are added
 - Interactive hover effects that show large preview images
 - Shows which slots have custom artwork vs empty slots
-- Progress tracking (X/Y Pokemon completed, where Y grows dynamically)
 
 ### Statistics Page
 - Overview cards showing total stats
@@ -21,7 +20,7 @@ A nice website to showcase custom Pokemon artwork with statistics tracking.
 - Individual artist performance metrics
 - Most popular Pokemon rankings
 
-## Technology Stack
+## Technology Stack Used
 
 - **React** with TypeScript
 - **Vite** for fast development
@@ -34,4 +33,4 @@ A nice website to showcase custom Pokemon artwork with statistics tracking.
 
 ## License
 
-This project is for personal use.
+This project is for personal use. Dont steal art pls :D
